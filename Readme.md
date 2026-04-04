@@ -305,8 +305,7 @@ Safety:
 
 ---
 
-## 📝 License
-
+## 📝 License 
 MIT License.
 
 ## Research Contributions: Trustworthiness & Explainability
