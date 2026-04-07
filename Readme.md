@@ -1,4 +1,4 @@
-# Trustworthy Pregnancy and postpartum‑Guidance ‑Guidance RAG System
+# Trustworthy Pregnancy and postpartum‑Guidance RAG System
 
 A fully local, explainable, safety‑validated Retrieval‑Augmented Generation (RAG) system designed to provide **reliable pregnancy and postpartum‑related information** with **transparent reasoning**, **hallucination detection**, and **safety scoring**.
 
