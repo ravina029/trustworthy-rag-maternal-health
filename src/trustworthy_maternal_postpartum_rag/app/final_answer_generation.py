@@ -1,7 +1,7 @@
 from __future__ import annotations
-
 import json
 import logging
+from multiprocessing import util
 import re
 import subprocess
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -9,6 +9,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from trustworthy_maternal_postpartum_rag.app.local_qa import (
     answer_question as retrieval_answer_question,
 )
+from trustworthy_maternal_postpartum_rag.grounding.claim_verifier import verify_answer
+from sentence_transformers import SentenceTransformer, util
 
 logger = logging.getLogger(__name__)
 
@@ -286,19 +288,23 @@ def _split_sentences(text: str) -> List[str]:
         return []
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+", t) if s.strip()]
 
-
-def _support_score(sentence: str, evidence_text: str) -> float:
-    s = re.findall(r"[A-Za-z0-9]+", (sentence or "").lower())
-    e = re.findall(r"[A-Za-z0-9]+", (evidence_text or "").lower())
-    if not s or not e:
+_model = SentenceTransformer("all-MiniLM-L6-v2")
+def _semantic_support_score(sentence: str, evidence_text: str) -> float:
+    if not sentence or not evidence_text:
         return 0.0
-    s_set, e_set = set(s), set(e)
-    j = len(s_set & e_set) / max(1, len(s_set | e_set))
-    s_bi = set(zip(s, s[1:])) if len(s) >= 2 else set()
-    e_bi = set(zip(e, e[1:])) if len(e) >= 2 else set()
-    b = (len(s_bi & e_bi) / max(1, len(s_bi))) if s_bi else 0.0
-    return float(0.4 * j + 0.6 * b)
+    
+    emb1 = _model.encode(sentence, convert_to_tensor=True)
+    emb2 = _model.encode(evidence_text, convert_to_tensor=True)
+    
+    score = util.cos_sim(emb1, emb2).item()
+    return float(score)
+def _support_score(sentence: str, evidence_text: str) -> float:
+    return _semantic_support_score(sentence, evidence_text)
 
+thresholds = {
+    "sentence_support": 0.5,
+    "supports_validation": 0.4
+}
 
 def _extract_numbers(text: str) -> List[str]:
     t = (text or "").lower()
@@ -802,6 +808,7 @@ def answer_question_final(
             ev["chunk_id"] = _eid(i)
 
     red_flags = detect_red_flags(query)
+
     prompt = build_generation_prompt(
         query=query,
         lifecycle=lifecycle,
@@ -833,6 +840,9 @@ def answer_question_final(
         except Exception:
             parsed = None
 
+    # ----------------------------
+    # HARD FAIL: cannot parse JSON
+    # ----------------------------
     if parsed is None:
         if red_flags:
             answer, safety_notes = _safe_safety_answer(query, red_flags)
@@ -845,12 +855,10 @@ def answer_question_final(
             confidence = "low"
 
         preview = (raw_repair or raw or "")[:800]
-        answer = _strip_external_links_text(answer)
-        safety_notes = [_strip_external_links_text(s) for s in safety_notes if isinstance(s, str) and s.strip()]
 
         return {
             "status": status,
-            "answer": answer,
+            "answer": _strip_external_links_text(answer),
             "prompt": prompt,
             "audit": {
                 **(base.get("audit", {}) or {}),
@@ -866,7 +874,43 @@ def answer_question_final(
             "evidence": evidence,
         }
 
-    normalized = _normalize_llm_output(parsed, query=query, evidence=evidence, red_flags=red_flags)
+    # ----------------------------
+    # Step 1: VERIFY BEFORE NORMALIZATION
+    # ----------------------------
+    raw_answer = parsed.get("answer", "")
+
+    retrieved_chunks = [
+        e.get("text", "") for e in evidence if isinstance(e, dict)
+    ]
+
+    verification = verify_answer(raw_answer, retrieved_chunks)
+
+    if not verification.get("all_supported", False):
+        return {
+            "status": "insufficient_evidence",
+            "answer": _safe_insufficient_answer(query),
+            "prompt": prompt,
+            "audit": {
+                **(base.get("audit", {}) or {}),
+                "llm": {
+                    **llm_audit_defaults,
+                    "llm_parse": "ok",
+                    "unsupported_claims": verification.get("unsupported_claims", []),
+                },
+            },
+            "evidence": evidence,
+        }
+
+    # ----------------------------
+    # Step 2: NORMALIZATION
+    # ----------------------------
+    normalized = _normalize_llm_output(
+        parsed,
+        query=query,
+        evidence=evidence,
+        red_flags=red_flags,
+    )
+
     raw_preview_final = (raw_repair or raw or "")[:800]
 
     return {
@@ -889,7 +933,6 @@ def answer_question_final(
         },
         "evidence": evidence,
     }
-
 
 def call_ollama(prompt: str) -> str:
     """
