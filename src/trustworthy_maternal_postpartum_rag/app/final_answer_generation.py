@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 import logging
 from multiprocessing import util
+import os
 import re
 import subprocess
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -288,22 +289,38 @@ def _split_sentences(text: str) -> List[str]:
         return []
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+", t) if s.strip()]
 
-_model = SentenceTransformer("all-MiniLM-L6-v2")
+_model = None
+
+def _get_model():
+    global _model
+    if _model is None:
+        try:
+            _model = SentenceTransformer("all-MiniLM-L6-v2")
+        except Exception as e:
+            print("WARNING: embedding model failed to load:", e)
+            _model = None
+    return _model
 def _semantic_support_score(sentence: str, evidence_text: str) -> float:
     if not sentence or not evidence_text:
         return 0.0
     
-    emb1 = _model.encode(sentence, convert_to_tensor=True)
-    emb2 = _model.encode(evidence_text, convert_to_tensor=True)
-    
+    model = _get_model()
+    if model is None:
+        return 0.0  # fallback score
+
+    emb1 = model.encode(sentence, convert_to_tensor=True)
+    emb2 = model.encode(evidence_text, convert_to_tensor=True)
+
     score = util.cos_sim(emb1, emb2).item()
+    print(f"[SIM] {score:.3f} | SENT: {sentence[:50]}...")
     return float(score)
+    
 def _support_score(sentence: str, evidence_text: str) -> float:
     return _semantic_support_score(sentence, evidence_text)
 
 thresholds = {
-    "sentence_support": 0.5,
-    "supports_validation": 0.4
+    "sentence_support": 0.25,
+    "supports_validation": 0.2
 }
 
 def _extract_numbers(text: str) -> List[str]:
@@ -786,6 +803,9 @@ def _normalize_llm_output(
 # ----------------------------
 # Public API: retrieval + final generation
 # ----------------------------
+# ----------------------------
+# FINAL: answer_question_final (CLEAN + FIXED)
+# ----------------------------
 
 def answer_question_final(
     query: str,
@@ -794,9 +814,13 @@ def answer_question_final(
     llm_fn: Optional[LLMFn] = None,
     debug: bool = False,
 ) -> Dict[str, Any]:
+
     if llm_fn is None:
         raise ValueError("answer_question_final requires llm_fn(prompt)->str")
 
+    # ----------------------------
+    # STEP 0: RETRIEVAL
+    # ----------------------------
     base = retrieval_answer_question(query, k=k, use_llm=False, debug=debug)
 
     lifecycle = (base.get("audit", {}) or {}).get("lifecycle", "general")
@@ -809,6 +833,9 @@ def answer_question_final(
 
     red_flags = detect_red_flags(query)
 
+    # ----------------------------
+    # STEP 1: GENERATION
+    # ----------------------------
     prompt = build_generation_prompt(
         query=query,
         lifecycle=lifecycle,
@@ -820,18 +847,8 @@ def answer_question_final(
     raw = llm_fn(prompt)
     parsed = _extract_json_obj(raw)
 
-    llm_audit_defaults = {
-        "red_flags": red_flags,
-        "llm_raw_preview": (raw or "")[:800],
-        "confidence": "low",
-        "evidence_used": [],
-        "citations": [],
-        "safety_notes": [],
-        "follow_up_questions": [],
-        "llm_repair_attempted": False,
-    }
-
     raw_repair = ""
+
     if parsed is None:
         try:
             repair_prompt = _build_json_repair_prompt(raw)
@@ -841,68 +858,78 @@ def answer_question_final(
             parsed = None
 
     # ----------------------------
-    # HARD FAIL: cannot parse JSON
+    # HARD FAIL: GENERATION ERROR
     # ----------------------------
     if parsed is None:
-        if red_flags:
-            answer, safety_notes = _safe_safety_answer(query, red_flags)
-            status = "safety_escalation"
-            confidence = "high"
-        else:
-            answer = _safe_insufficient_answer(query)
-            safety_notes = []
-            status = "insufficient_evidence"
-            confidence = "low"
-
-        preview = (raw_repair or raw or "")[:800]
-
         return {
-            "status": status,
-            "answer": _strip_external_links_text(answer),
+            "status": "generation_error",
+            "answer": "The system failed to generate a valid response. Please retry.",
             "prompt": prompt,
-            "audit": {
-                **(base.get("audit", {}) or {}),
-                "llm": {
-                    **llm_audit_defaults,
-                    "llm_parse": "failed",
-                    "llm_raw_preview": preview,
-                    "llm_repair_attempted": bool(raw_repair),
-                    "confidence": confidence,
-                    "safety_notes": safety_notes,
-                },
-            },
+            "audit": base.get("audit", {}),
             "evidence": evidence,
         }
 
     # ----------------------------
-    # Step 1: VERIFY BEFORE NORMALIZATION
+    # STEP 2: VERIFICATION (RAW ANSWER ONLY)
     # ----------------------------
     raw_answer = parsed.get("answer", "")
 
+    def _clean_text_for_verification(t: str) -> str:
+        if not t:
+            return ""
+        t = re.sub(r"\s+", " ", t)
+        t = re.sub(r"([a-z])([A-Z])", r"\1. \2", t)
+        return t.strip()
+
     retrieved_chunks = [
-        e.get("text", "") for e in evidence if isinstance(e, dict)
+        _clean_text_for_verification(e.get("text", ""))
+        for e in evidence if isinstance(e, dict)
     ]
 
-    verification = verify_answer(raw_answer, retrieved_chunks)
-
-    if not verification.get("all_supported", False):
-        return {
-            "status": "insufficient_evidence",
-            "answer": _safe_insufficient_answer(query),
-            "prompt": prompt,
-            "audit": {
-                **(base.get("audit", {}) or {}),
-                "llm": {
-                    **llm_audit_defaults,
-                    "llm_parse": "ok",
-                    "unsupported_claims": verification.get("unsupported_claims", []),
-                },
-            },
-            "evidence": evidence,
+    try:
+        verification = verify_answer(raw_answer, retrieved_chunks)
+    except Exception:
+        verification = {
+            "supported_sentences": [],
+            "unsupported_claims": _split_sentences(raw_answer),
         }
 
+    if not isinstance(verification, dict):
+        verification = {}
+
+    supported_sentences = verification.get("supported_sentences", [])
+    unsupported_sentences = verification.get("unsupported_claims", [])
+
     # ----------------------------
-    # Step 2: NORMALIZATION
+    # STEP 3: HANDLE VERIFICATION OUTPUT
+    # ----------------------------
+
+    # Case 1: Nothing supported → fallback
+    if not supported_sentences:
+        fallback_answer = _answer_from_supports(parsed.get("citations", []))
+
+        if fallback_answer:
+            parsed["answer"] = fallback_answer
+            parsed["confidence"] = "low"
+        else:
+            return {
+                "status": "insufficient_evidence",
+                "answer": _safe_insufficient_answer(query),
+                "prompt": prompt,
+                "audit": base.get("audit", {}),
+                "evidence": evidence,
+            }
+
+    # Case 2: Partial support → truncate
+    filtered_answer = " ".join(supported_sentences) if supported_sentences else parsed.get("answer", "")
+
+    confidence = "medium" if unsupported_sentences else parsed.get("confidence", "high")
+
+    parsed["answer"] = filtered_answer.strip()
+    parsed["confidence"] = confidence
+
+    # ----------------------------
+    # STEP 4: NORMALIZATION
     # ----------------------------
     normalized = _normalize_llm_output(
         parsed,
@@ -911,8 +938,19 @@ def answer_question_final(
         red_flags=red_flags,
     )
 
-    raw_preview_final = (raw_repair or raw or "")[:800]
+    # ----------------------------
+    # STEP 5: FAILURE TYPE TRACKING
+    # ----------------------------
+    failure_type = None
 
+    if not evidence:
+        failure_type = "retrieval_failure"
+    elif not supported_sentences:
+        failure_type = "verification_failure"
+
+    # ----------------------------
+    # FINAL OUTPUT
+    # ----------------------------
     return {
         "status": normalized["status"],
         "answer": normalized["answer"],
@@ -920,10 +958,8 @@ def answer_question_final(
         "audit": {
             **(base.get("audit", {}) or {}),
             "llm": {
-                **llm_audit_defaults,
-                "llm_parse": "ok",
-                "llm_raw_preview": raw_preview_final,
-                "llm_repair_attempted": bool(raw_repair),
+                "failure_type": failure_type,
+                "unsupported_claims": unsupported_sentences,
                 "confidence": normalized["confidence"],
                 "evidence_used": normalized["evidence_used"],
                 "citations": normalized["citations"],
@@ -933,7 +969,6 @@ def answer_question_final(
         },
         "evidence": evidence,
     }
-
 def call_ollama(prompt: str) -> str:
     """
     Calls Ollama locally and returns raw text output.

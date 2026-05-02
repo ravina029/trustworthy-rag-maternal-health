@@ -4,9 +4,16 @@ import os
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
 import chromadb
 from chromadb.utils import embedding_functions
+import random
+from utils.config import get_config
+import numpy as np
+from utils.config import get_config
+
+CFG = get_config()
+
+np.random.seed(CFG["run"]["seed"])
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +199,8 @@ def retrieve(
     device: Optional[str] = None,
     where: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
+    
+    collection_name = collection_name or f"{CFG['indexing']['collection_prefix']}_{CFG['run']['version']}"
     """
     Returns a list of hits:
       [{"id": str, "text": str, "metadata": dict, "distance": float}, ...]
@@ -206,7 +215,6 @@ def retrieve(
     defaults = _get_defaults()
 
     chroma_path = Path(chroma_path or defaults["chroma_path"])
-    collection_name = collection_name or defaults["collection"]
     embed_model = embed_model or defaults["embed_model"]
     device = device or defaults["device"]
     disable_cache = bool(defaults["disable_cache"])
