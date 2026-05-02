@@ -1,0 +1,28 @@
+run:
+  seed: 42
+  version: v1
+
+preprocessing:
+  remove_numeric_threshold: 0.7
+  enable_auto_filter: true
+
+chunking:
+  max_words: 450
+  overlap_words: 60
+  semantic_split: true
+  semantic_threshold: 0.65
+  min_sentences_for_semantic: 8
+  enable_chunk_dedup: true
+  dedup_mode: global
+
+indexing:
+  batch_size: 128
+  collection_prefix: maternal_postpartum
+  rebuild_collection: false
+
+embedding:
+  device: cpu
+  model: all-MiniLM-L6-v2
+
+logging:
+  level: INFO
