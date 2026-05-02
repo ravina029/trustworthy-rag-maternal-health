@@ -1,5 +1,4 @@
 import subprocess
-
 def call_ollama(prompt: str) -> str:
     """
     Calls Ollama locally and returns raw text output.
