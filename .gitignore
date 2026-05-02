@@ -33,9 +33,10 @@ data/processed/
 *.egg-info/
 build/
 dist/
-eval_runs/
+results/
 *.jsonl
 *.json
+
 
 
 # Python packaging
@@ -45,3 +46,5 @@ dist/
 __pycache__/
 .pytest_cache/
 next.md
+results/
+logs/
