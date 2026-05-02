@@ -11,11 +11,16 @@ import json
 from collections import Counter
 import hashlib
 import os
+from trustworthy_maternal_postpartum_rag.utils.config import get_config
+import random
+import numpy as np
 
+
+CFG = get_config("configs/pipeline_config.yaml")
+#os.environ["PYTHONHASHSEED"] = str(CFG["run"]["seed"])
 # ============================================================
 # Pipeline RUN_ID
 # ============================================================
-print("Preprocessing started.")
 RUN_ID_ENV = "TMPRAG_RUN_ID"
 
 def get_run_id() -> str:
@@ -41,20 +46,20 @@ LOG_FILE = Path("logs/data_logs/preprocessing.log")
 LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger("tmprag.ingestion.preprocessing")
-logger.setLevel(logging.INFO)
-
+LOG_LEVEL = getattr(logging, CFG["logging"]["level"].upper(), logging.INFO)
+logger.setLevel(LOG_LEVEL)
 fmt = "%(asctime)s - %(levelname)s - run_id=%(run_id)s - %(message)s"
 
 if not any(isinstance(h, logging.FileHandler) and getattr(h, "baseFilename", "") == str(LOG_FILE) for h in logger.handlers):
     fh = logging.FileHandler(LOG_FILE, mode="a", encoding="utf-8")
-    fh.setLevel(logging.INFO)
+    fh.setLevel(LOG_LEVEL)
     fh.setFormatter(logging.Formatter(fmt))
     fh.addFilter(RunIdFilter())
     logger.addHandler(fh)
 
 if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
     sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
+    sh.setLevel(LOG_LEVEL)
     sh.setFormatter(logging.Formatter(fmt))
     sh.addFilter(RunIdFilter())
     logger.addHandler(sh)
@@ -125,7 +130,7 @@ def detect_repeated_headers_footers(pages_raw_text):
             c = line.strip()
             if c:
                 line_counter[c] += 1
-    threshold = len(pages_raw_text) * 0.2
+    threshold = max(5, len(pages_raw_text) * 0.2)
     return {line for line, count in line_counter.items() if count > threshold}
 
 
@@ -146,11 +151,33 @@ def remove_noise_lines(text: str, repeated_noise=None) -> str:
     return "\n".join(out)
 
 
-def merge_paragraph_lines(text: str) -> str:
-    paragraphs = text.split("\n\n")
-    merged = [" ".join(p.splitlines()) for p in paragraphs]
-    return "\n\n".join(merged)
+def merge_paragraph_lines(text):
+    lines = text.splitlines()
+    merged = []
+    buffer = []
 
+    for line in lines:
+        s = line.strip()
+        if not s:
+            if buffer:
+                merged.append(" ".join(buffer))
+                buffer = []
+            continue
+
+        # keep headings separately
+        if re.match(r"^(chapter|recommendation|remarks|background)\b", s.lower()):
+            if buffer:
+                merged.append(" ".join(buffer))
+                buffer = []
+            merged.append(s)
+            continue
+
+        buffer.append(s)
+
+    if buffer:
+        merged.append(" ".join(buffer))
+
+    return "\n\n".join(merged)
 
 def should_remove_page(text: str) -> bool:
     lower = text.lower()
@@ -176,7 +203,12 @@ def should_remove_page(text: str) -> bool:
         return True
 
     num_ratio = sum(c.isdigit() for c in text) / max(len(text), 1)
-    if num_ratio > 0.60:
+
+    def is_table_like(text: str) -> bool:
+        return text.count(":") > 10 or text.count("- ") > 10
+    threshold = CFG["preprocessing"]["remove_numeric_threshold"]
+
+    if num_ratio > threshold and not is_table_like(text) and len(text) < 500:
         return True
 
     boilerplate_hit = re.search(
@@ -203,13 +235,13 @@ def manual_page_skip(pdf_name, page_num) -> bool:
 def infer_doc_metadata(pdf_name: str):
     name = pdf_name.lower()
     meta = {
-        "country": None,
-        "stage": None,
-        "target": None,
-        "source_type": "guideline",
-        "publisher": None,
-        "year": None,
-    }
+    "country": None,
+    "stage": None,
+    "target": None,
+    "source_type": "guideline",
+    "publisher": None,
+    "doc_title": Path(pdf_name).stem,
+}
 
     if "who_antenatal care" in name:
         meta.update({"country": "Global/WHO", "stage": "pregnancy", "target": "mother", "publisher": "WHO"})
@@ -247,15 +279,18 @@ def _page_fingerprint(text: str) -> str:
 
 
 def preprocess_pdf_to_pages(pdf_path: Path, doc_id=None):
-    doc_id = doc_id or str(uuid.uuid4())
+    doc_id = doc_id or hashlib.sha256(str(pdf_path).encode()).hexdigest()
     pdf_name = pdf_path.name.lower()
     doc_meta = infer_doc_metadata(pdf_path.name)
     doc_metadata = {
-    "country": doc_meta["country"],
-    "stage": doc_meta["stage"],
-    "target": doc_meta["target"],
-    "source_type": doc_meta["source_type"],
+    "country": doc_meta.get("country"),
+    "stage": doc_meta.get("stage"),
+    "target": doc_meta.get("target"),
+    "source_type": doc_meta.get("source_type"),
     "publisher": doc_meta.get("publisher"),
+    "doc_title": doc_meta.get("doc_title"),
+    "lifecycle": doc_meta.get("stage"),
+    "doc_version": CFG.get("run", {}).get("version", "v1"),
 }
 
     t0 = time.time()
@@ -288,7 +323,7 @@ def preprocess_pdf_to_pages(pdf_path: Path, doc_id=None):
                 "skip_reason": "manual_skip",
                 "doc_metadata": doc_metadata,
                 "language": "en",
-                "version": "1.2",
+                "version": CFG.get("run", {}).get("version", "v1"),
             })
             continue
 
@@ -298,27 +333,28 @@ def preprocess_pdf_to_pages(pdf_path: Path, doc_id=None):
         text = remove_noise_lines(text, repeated_noise)
         text = merge_paragraph_lines(text)
 
-        fp = _page_fingerprint(text)
-        if fp in seen_page_fps:
-            deduped += 1
-            preprocessed_pages.append({
-                "page_id": str(uuid.uuid4()),
-                "doc_id": doc_id,
-                "source_file": pdf_path.name,
-                "page_number": i,
-                "text": "",
-                "skipped": True,
-                "skip_reason": "deduped_duplicate_page",
-                "doc_metadata": doc_metadata,
-                "language": "en",
-                "version": "1.2",
-            })
-            continue
-        seen_page_fps.add(fp)
+        if CFG["chunking"]["enable_chunk_dedup"]:
+            fp = _page_fingerprint(text)
+            if fp in seen_page_fps:
+                deduped += 1
+                preprocessed_pages.append({
+                    "page_id": str(uuid.uuid4()),
+                    "doc_id": doc_id,
+                    "source_file": pdf_path.name,
+                    "page_number": i,
+                    "text": "",
+                    "skipped": True,
+                    "skip_reason": "deduped_duplicate_page",
+                    "doc_metadata": doc_metadata,
+                    "language": "en",
+                    "version": CFG.get("run", {}).get("version", "v1"),
+                })
+                continue
+            seen_page_fps.add(fp)
 
         skipped = False
         skip_reason = None
-        if should_remove_page(text):
+        if CFG["preprocessing"]["enable_auto_filter"] and should_remove_page(text):
             skipped = True
             skip_reason = "auto_filter"
             auto_filtered += 1
@@ -335,15 +371,24 @@ def preprocess_pdf_to_pages(pdf_path: Path, doc_id=None):
             "skip_reason": skip_reason,
             "doc_metadata": doc_metadata,
             "language": "en",
-            "version": "1.2",
+            "version": CFG.get("run", {}).get("version", "v1"),
         })
 
     dt = time.time() - t0
     logger.info(
         f"[Preprocess] Done | file={pdf_path.name} pages={len(raw_pages)} kept={kept} manual={manual_skipped} auto={auto_filtered} deduped={deduped} seconds={dt:.2f}"
     )
+    logger.info(
+    "[PreprocessStats] file=%s kept=%d skipped=%d deduped=%d ratio_kept=%.2f",
+    pdf_path.name,
+    kept,
+    manual_skipped + auto_filtered + deduped,
+    deduped,
+    kept / max(len(raw_pages), 1)
+    )
 
     return preprocessed_pages
+
 
 
 if __name__ == "__main__":
