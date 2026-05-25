@@ -47,6 +47,10 @@ This project investigates an alternative direction:
 > **Can RAG systems be designed and evaluated primarily around reliability rather than generation quality?**
 
 ---
+## Data Corpus
+The corpus consists of curated maternal, postpartum, and newborn-care guidance documents from public-health and clinical sources, including WHO, NHS, ACOG, Cleveland Clinic, and government high-risk pregnancy guidance. The project is designed as a research prototype to evaluate retrieval reliability, source grounding, hallucination behavior, and safety-aware response handling, rather than as a clinical decision-making system.
+"The full document corpus is stored locally and is not committed due to copyright and licensing constraints. 
+The repository includes a document registry template showing the metadata structure used for ingestion, retrieval filtering, and evaluation."
 
 ## Core Contributions
 
@@ -130,7 +134,7 @@ src/
 
 ## Evaluation Framework
 
-The system is evaluated across multiple dimensions.
+The system is evaluated across multiple dimensions on questions answerable from a curated corpus covering pregnancy, postpartum recovery, breastfeeding-adjacent care, high-risk pregnancy flags, and newborn-care guidance. The evaluation set is built only around what these documents actually cover.
 
 ### 1. Groundedness
 
