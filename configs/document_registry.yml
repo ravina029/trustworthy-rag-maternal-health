@@ -1,0 +1,90 @@
+documents:
+  - doc_id: acog_pregnancy_guide
+    file_path: "data/raw/Pregnancy_postpartum/ACOG_Pregnancy Guide.pdf"
+    publisher: "ACOG"
+    source_tier: "core_authoritative"
+    document_style: "patient_friendly"
+    lifecycle_stage: "pregnancy"
+    topic_scope: "pregnancy_questions"
+    country_scope: "US"
+    priority_score: 3
+
+  - doc_id: cleveland_clinic_pregnancy_guide
+    file_path: "data/raw/Pregnancy_postpartum/CLEVELAND CLINIC_pregnancy_guide.pdf"
+    publisher: "Cleveland Clinic"
+    source_tier: "secondary_patient_friendly"
+    document_style: "patient_friendly"
+    lifecycle_stage: "pregnancy"
+    topic_scope: "healthy_pregnancy"
+    country_scope: "US"
+    priority_score: 2
+
+  - doc_id: india_pmsma_high_risk_pregnancy
+    file_path: "data/raw/Pregnancy_postpartum/India_PMSMA_High-Risk-Conditions-in-preg-modified-Final.pdf"
+    publisher: "Government of India / PMSMA"
+    source_tier: "core_authoritative"
+    document_style: "public_health_guidance"
+    lifecycle_stage: "pregnancy"
+    topic_scope: "high_risk_pregnancy"
+    country_scope: "India"
+    priority_score: 3
+
+  - doc_id: nhs_pregnancy_postpartum_guide
+    file_path: "data/raw/Pregnancy_postpartum/NHS_pregnancy_postpartum_guide.pdf"
+    publisher: "NHS"
+    source_tier: "core_authoritative"
+    document_style: "patient_friendly"
+    lifecycle_stage: "pregnancy_postpartum"
+    topic_scope: "pregnancy_postpartum_guidance"
+    country_scope: "UK"
+    priority_score: 3
+
+  - doc_id: who_antenatal_care
+    file_path: "data/raw/Pregnancy_postpartum/who_antenatal care.pdf"
+    publisher: "WHO"
+    source_tier: "core_authoritative"
+    document_style: "guideline"
+    lifecycle_stage: "pregnancy"
+    topic_scope: "antenatal_care"
+    country_scope: "global"
+    priority_score: 4
+
+  - doc_id: who_pcpnc_third_edition
+    file_path: "data/raw/Pregnancy_postpartum/who_pcpnc_third_edition.pdf"
+    publisher: "WHO"
+    source_tier: "core_authoritative"
+    document_style: "clinical_practice_guide"
+    lifecycle_stage: "pregnancy_childbirth_postpartum_newborn"
+    topic_scope: "pregnancy_childbirth_postpartum_newborn_care"
+    country_scope: "global"
+    priority_score: 4
+
+  - doc_id: who_postnatal_positive_experience
+    file_path: "data/raw/Pregnancy_postpartum/who_postnatal_positive_experience.pdf"
+    publisher: "WHO"
+    source_tier: "core_authoritative"
+    document_style: "guideline"
+    lifecycle_stage: "postpartum_newborn"
+    topic_scope: "postnatal_maternal_newborn_care"
+    country_scope: "global"
+    priority_score: 4
+
+  - doc_id: baby_411
+    file_path: "data/raw/infant_and_child_care/Baby 411 Clear Answers and Smart Advice for Your Babys First Year (Brown, Ari, Fields, Denise).pdf"
+    publisher: "Baby 411"
+    source_tier: "secondary_patient_friendly"
+    document_style: "commercial_book"
+    lifecycle_stage: "newborn_infant"
+    topic_scope: "baby_care"
+    country_scope: "US"
+    priority_score: 1
+
+  - doc_id: nhs_newborn_children_care
+    file_path: "data/raw/infant_and_child_care/Newborn_and_children_care - NHS.pdf"
+    publisher: "NHS"
+    source_tier: "core_authoritative"
+    document_style: "patient_friendly"
+    lifecycle_stage: "newborn_infant_child"
+    topic_scope: "newborn_child_care"
+    country_scope: "UK"
+    priority_score: 3

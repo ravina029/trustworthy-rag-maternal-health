@@ -18,6 +18,7 @@ chunking:
 indexing:
   batch_size: 128
   collection_prefix: maternal_postpartum
+  collection_name: maternal_postpartum_chunks
   rebuild_collection: false
 
 embedding:
