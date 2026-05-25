@@ -2,6 +2,12 @@ experiment:
   name: baseline_v1
   version: v1
 
+run:
+  version: v1
+
+indexing:
+  collection_prefix: maternal_postpartum
+
 queries:
   - What foods improve recovery after C-section delivery?
   - Can bananas worsen cold symptoms in infants?
@@ -10,6 +16,8 @@ queries:
 
 retrieval:
   top_k: 7
+  max_distance: 0.75
+  max_hits_per_publisher: 2
 
 llm:
   model: llama3
