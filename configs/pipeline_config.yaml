@@ -5,6 +5,7 @@ run:
 preprocessing:
   remove_numeric_threshold: 0.7
   enable_auto_filter: true
+  strict_document_registry: true
 
 chunking:
   max_words: 450
@@ -27,3 +28,9 @@ embedding:
 
 logging:
   level: INFO
+
+paths:
+  document_registry: "configs/document_registry.yml"
+
+
+  
