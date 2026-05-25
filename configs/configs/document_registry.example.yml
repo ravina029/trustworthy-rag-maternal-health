@@ -1,0 +1,20 @@
+documents:
+  - doc_id: example_who_antenatal
+    file_path: "data/raw/Pregnancy_postpartum/example_who_antenatal.pdf"
+    publisher: "WHO"
+    source_tier: "core_authoritative"
+    document_style: "guideline"
+    lifecycle_stage: "pregnancy"
+    topic_scope: "antenatal_care"
+    country_scope: "global"
+    priority_score: 4
+
+  - doc_id: example_patient_friendly_source
+    file_path: "data/raw/Pregnancy_postpartum/example_patient_guide.pdf"
+    publisher: "Example Patient Source"
+    source_tier: "secondary_patient_friendly"
+    document_style: "patient_friendly"
+    lifecycle_stage: "pregnancy"
+    topic_scope: "general_pregnancy"
+    country_scope: "unknown"
+    priority_score: 2
