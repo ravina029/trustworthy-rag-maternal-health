@@ -233,7 +233,7 @@ def manual_page_skip(pdf_name, page_num) -> bool:
 
 
 def infer_doc_metadata(pdf_name: str):
-    name = pdf_name.lower()
+    name = pdf_name.lower().strip().replace("-", "_").replace(" ", "_")
     meta = {
     "country": None,
     "stage": None,
@@ -251,7 +251,7 @@ def infer_doc_metadata(pdf_name: str):
         meta.update({"country": "Global/WHO", "stage": "postpartum+newborn", "target": "mother+baby", "publisher": "WHO"})
     elif "india_pmsma_high-risk-conditions-in-preg-modified-final" in name or "high-risk-conditions-in-preg-modified-final" in name:
         meta.update({"country": "India", "stage": "pregnancy", "target": "mother", "source_type": "national_guideline", "publisher": "Government of India"})
-    elif "nhs_pregnancy_postpartum_guide" in name:
+    elif "nhs" in name and "pregnancy" in name:
         meta.update({"country": "United Kingdom", "stage": "pregnancy+postpartum", "target": "mother+baby", "source_type": "patient_guide", "publisher": "NHS"})
     elif "newborn_and_children_care" in name and "nhs" in name:
         meta.update({"country": "United Kingdom", "stage": "newborn+child", "target": "baby+child", "source_type": "patient_guide", "publisher": "NHS"})
@@ -261,7 +261,13 @@ def infer_doc_metadata(pdf_name: str):
         meta.update({"country": "United States", "stage": "pregnancy+postpartum", "target": "mother+baby", "source_type": "patient_guide", "publisher": "ACOG"})
     elif "cleveland clinic" in name and "pregnancy" in name:
         meta.update({"country": "United States", "stage": "pregnancy+postpartum", "target": "mother+baby", "source_type": "patient_guide", "publisher": "Cleveland Clinic"})
-
+    if meta["publisher"] is None:
+        if "nhs" in name:
+            meta["publisher"] = "NHS"
+        elif "acog" in name:
+            meta["publisher"] = "ACOG"
+        elif "who" in name:
+            meta["publisher"] = "WHO"
     return meta
 
 
