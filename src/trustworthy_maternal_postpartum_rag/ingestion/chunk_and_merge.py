@@ -125,6 +125,11 @@ def make_chunk(
 
     text = (text or "").strip()
 
+    min_words = CFG.get("chunking", {}).get("min_words", 25)
+
+    if len(text.split()) < min_words and topic_hint not in {"emergency", "table"}:
+        return None
+
     if not text:
         return None
 
