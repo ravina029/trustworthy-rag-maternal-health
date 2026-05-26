@@ -8,13 +8,14 @@ preprocessing:
   strict_document_registry: true
 
 chunking:
-  max_words: 450
-  overlap_words: 60
-  semantic_split: true
+  max_words: 220
+  min_words: 25
+  overlap_words: 40
+  semantic_split: false
   semantic_threshold: 0.65
   min_sentences_for_semantic: 8
   enable_chunk_dedup: true
-  dedup_mode: global
+  dedup_mode: page
 
 indexing:
   batch_size: 128
