@@ -7,7 +7,7 @@ def run():
     subprocess.run(["python", "-m", "trustworthy_maternal_postpartum_rag.ingestion.preprocessing"], check=True)
 
     print("STEP 2: Chunking")
-    subprocess.run(["python", "-m", "trustworthy_maternal_postpartum_rag.ingestion.chunking"], check=True)
+    subprocess.run(["python", "-m", "trustworthy_maternal_postpartum_rag.ingestion.chunk_and_merge"], check=True)
 
     print("STEP 3: Indexing")
     subprocess.run(["python", "-m", "trustworthy_maternal_postpartum_rag.ingestion.chroma_index"], check=True)
