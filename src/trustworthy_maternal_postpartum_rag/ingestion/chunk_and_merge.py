@@ -311,7 +311,7 @@ def chunk_preprocessed_files(
             pre_file.name,
             out_file.name,
         )
-
+        seen_chunk_ids = set()
         seen_global = set()
         seen_by_page: Dict[Any, set] = {}
 
@@ -367,7 +367,13 @@ def chunk_preprocessed_files(
                                 continue
 
                             seen_global.add(fp)
+                    chunk_id = chunk.get("chunk_id")
 
+                    if chunk_id in seen_chunk_ids:
+                        chunks_deduped += 1
+                        continue
+
+                    seen_chunk_ids.add(chunk_id)
                     fout.write(json.dumps(chunk, ensure_ascii=False) + "\n")
 
                     chunks_out += 1
