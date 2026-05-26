@@ -1,4 +1,4 @@
-# src/trustworthy_maternal_postpartum_rag/ingestion/chroma_index.py
+# src/trustworthy_maternal_postpartum_rag/ingestion/index_to_chroma.py
 
 import json
 from pathlib import Path
