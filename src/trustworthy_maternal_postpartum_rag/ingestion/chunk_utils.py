@@ -254,7 +254,7 @@ def split_block_by_length(
     for part in parts:
         words = part.split()
 
-        if len(words) > max_words * 2:
+        if len(words) > max_words:
             start = 0
 
             while start < len(words):
