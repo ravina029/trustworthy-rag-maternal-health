@@ -1,12 +1,10 @@
 run:
   seed: 42
   version: v1
-
 preprocessing:
   remove_numeric_threshold: 0.7
   enable_auto_filter: true
   strict_document_registry: true
-
 chunking:
   max_words: 220
   min_words: 25
@@ -16,22 +14,21 @@ chunking:
   min_sentences_for_semantic: 8
   enable_chunk_dedup: true
   dedup_mode: page
-
 indexing:
   batch_size: 128
   collection_prefix: maternal_postpartum
   collection_name: maternal_postpartum_chunks
   rebuild_collection: false
-
+retrieval:
+  max_distance: null
+  max_hits_per_publisher: 3
+  candidate_multiplier: 8
+  min_candidate_pool: 32
+  top_k: 8
 embedding:
   device: cpu
   model: all-MiniLM-L6-v2
-
 logging:
   level: INFO
-
 paths:
-  document_registry: "configs/document_registry.yml"
-
-
-  
+  document_registry: configs/document_registry.yml

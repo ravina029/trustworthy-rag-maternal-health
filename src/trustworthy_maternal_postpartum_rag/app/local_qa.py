@@ -180,23 +180,43 @@ def infer_topic_from_query(query: str) -> str:
 
 def stage_aligns(meta: Dict[str, Any], lifecycle: str) -> bool:
     """
-    Conservative guardrail to prevent cross-stage leakage.
+    Guardrail to prevent cross-stage leakage.
+
+    Supports both:
+    - legacy metadata: stage, lifecycle
+    - canonical metadata: lifecycle_stage, topic_scope
     """
-    stage = (meta.get("stage") or "").lower()
+
+    stage_text = " ".join([
+        str(meta.get("stage") or ""),
+        str(meta.get("lifecycle") or ""),
+        str(meta.get("lifecycle_stage") or ""),
+        str(meta.get("topic_scope") or ""),
+        str(meta.get("inferred_lifecycle") or ""),
+    ]).lower()
 
     if lifecycle == "pregnancy":
-        return "pregnancy" in stage
+        return "pregnancy" in stage_text or "antenatal" in stage_text
+
     if lifecycle == "postpartum":
-        return "postpartum" in stage
+        return "postpartum" in stage_text or "postnatal" in stage_text
+
     if lifecycle == "breastfeeding":
-        # breastfeeding can be discussed in pregnancy+postpartum guides
-        return ("breast" in stage) or ("postpartum" in stage) or ("pregnancy" in stage)
+        return (
+            "breast" in stage_text
+            or "postpartum" in stage_text
+            or "postnatal" in stage_text
+            or "pregnancy" in stage_text
+            or "newborn" in stage_text
+            or "infant" in stage_text
+        )
+
     if lifecycle in {"newborn", "infant", "toddler"}:
-        return ("baby" in stage) or ("child" in stage) or ("infant" in stage) or ("newborn" in stage)
+        return any(x in stage_text for x in [
+            "baby", "child", "infant", "newborn", "toddler"
+        ])
 
     return True
-
-
 # ============================================================
 # Metadata hygiene helpers
 # ============================================================
@@ -244,10 +264,14 @@ def publisher_counts(hits: List[Dict[str, Any]]) -> Dict[str, int]:
 
 def meta_match_score(meta: Dict[str, Any], topic: str, lifecycle: str) -> int:
     score = 0
+
     if meta.get("topic_hint") == topic:
         score += 2
-    if meta.get("lifecycle") == lifecycle:
+
+    # Accept multi-stage metadata such as pregnancy_postpartum.
+    if stage_aligns(meta, lifecycle):
         score += 2
+
     score += PUBLISHER_PRIORITY.get(meta.get("publisher"), 0)
     return score
 
@@ -546,8 +570,12 @@ def answer_question(
     logger.info("[%s] Inferred lifecycle: %s", audit_run_id, lifecycle)
     logger.info("[%s] Inferred topic: %s", audit_run_id, topic)
 
-    # Retrieval-time filter (important): reduces leakage and improves diversity selection
-    where = {"lifecycle": lifecycle} if lifecycle != "general" else None
+    # Retrieval-time Chroma filter intentionally disabled.
+    # Chroma stores canonical metadata such as lifecycle_stage/topic_scope.
+    # The legacy lifecycle alias is added only after retrieval, so filtering
+    # here with {"lifecycle": lifecycle} incorrectly returns zero hits.
+    # Stage/lifecycle control is applied after retrieval via stage_aligns().
+    where = None
 
     candidate_k = max(k * 12, 48)
     raw_hits = retrieve_fn(query, k=candidate_k, where=where)
@@ -568,7 +596,7 @@ def answer_question(
         logger.warning("[%s] Low stage-aligned evidence; keeping unfiltered hits", audit_run_id)
         candidate_hits = raw_hits
 
-    lifecycle_hits = [h for h in candidate_hits if (h.get("metadata") or {}).get("lifecycle") == lifecycle]
+    lifecycle_hits = [h for h in candidate_hits if stage_aligns(h.get("metadata") or {}, lifecycle)]
     logger.info("[%s] Lifecycle-matched hits: %d", audit_run_id, len(lifecycle_hits))
 
     if lifecycle != "general" and len(lifecycle_hits) >= MIN_EVIDENCE_CHUNKS:

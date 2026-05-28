@@ -68,5 +68,5 @@ def run_pipeline(config_path: str):
 
 
 if __name__ == "__main__":
-    config_path = os.getenv("TMPRAG_CONFIG_PATH", "configs/default.yaml")
+    config_path = os.getenv("TMPRAG_CONFIG_PATH", "configs/pipeline_config.yaml")
     run_pipeline(config_path)

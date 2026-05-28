@@ -25,7 +25,7 @@ def now():
 
 
 def load_config():
-    config_path = os.getenv("TMPRAG_CONFIG_PATH", "configs/default.yaml")
+    config_path = os.getenv("TMPRAG_CONFIG_PATH", "configs/pipeline_config.yaml")
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
@@ -71,7 +71,7 @@ def main():
             "type": "run_meta",
             "run_id": run_id,
             "ts": now(),
-            "config_used": os.getenv("TMPRAG_CONFIG_PATH", "configs/default.yaml"),
+            "config_used": os.getenv("TMPRAG_CONFIG_PATH", "configs/pipeline_config.yaml"),
             "k": k,
             "n_questions": len(questions)
         }) + "\n")
