@@ -1,6 +1,8 @@
 # Trustworthy RAG for Maternal & Postpartum Health  
 ### An Evaluation-First Retrieval-Augmented Generation Framework for Safety-Sensitive Question Answering
-
+1. Replace "insufficient": None and "adversarial": None in scripts/extract_representative_examples.py with the new run paths.
+2. Update results/evaluation_run_manifest.md.
+3. Rerun representative example extraction with the new insufficient/adversarial paths.
 ---
 
 ## Overview
