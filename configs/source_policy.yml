@@ -1,0 +1,18 @@
+source_priority:
+  WHO: 4
+  NHS: 3
+  ACOG: 3
+  "Government of India / PMSMA": 3
+  "Cleveland Clinic": 2
+  "Baby 411": 1
+
+tier_priority:
+  core_authoritative: 3
+  secondary_patient_friendly: 1
+
+high_risk_allowed_tiers:
+  - core_authoritative
+
+general_allowed_tiers:
+  - core_authoritative
+  - secondary_patient_friendly

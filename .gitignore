@@ -20,8 +20,18 @@ chroma_old_env/
 models/
 data/raw/
 data/processed/
+data/chunks/
+data/chroma_db/
+data/chunks/
 *.gguf
 *.bin
+*.pdf
+*.docx
+*.epub
+*.pkl
+*.sqlite
+*.db
+.env
 
 # Jupyter
 .ipynb_checkpoints
@@ -33,9 +43,10 @@ data/processed/
 *.egg-info/
 build/
 dist/
-eval_runs/
+results/
 *.jsonl
 *.json
+
 
 
 # Python packaging
@@ -45,3 +56,5 @@ dist/
 __pycache__/
 .pytest_cache/
 next.md
+results/
+logs/

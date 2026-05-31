@@ -7,8 +7,32 @@ import uuid
 from dataclasses import dataclass
 from typing import List, Dict, Any, Callable, Optional
 from collections import Counter
-
 from trustworthy_maternal_postpartum_rag.retrieval.chroma_retriever import retrieve as chroma_retrieve
+import numpy as np
+from functools import lru_cache
+from sentence_transformers import SentenceTransformer
+from sentence_transformers import CrossEncoder
+
+_cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+
+
+_model = SentenceTransformer("BAAI/bge-base-en-v1.5")
+_embedding_cache = {}
+
+THRESHOLDS = {
+    "groundedness_mean": float(os.getenv("TMPRAG_GROUNDEDNESS_MEAN", 0.45)),
+    "groundedness_min": float(os.getenv("TMPRAG_GROUNDEDNESS_MIN", 0.30)),
+}
+
+def embed_texts(texts: List[str]):
+    missing = [t for t in texts if t not in _embedding_cache]
+
+    if missing:
+        embs = _model.encode(missing,normalize_embeddings=True,convert_to_numpy=True )
+        for t, e in zip(missing, embs):
+            _embedding_cache[t] = e
+
+    return np.array([_embedding_cache[t] for t in texts])
 
 logger = logging.getLogger(__name__)
 
@@ -156,23 +180,43 @@ def infer_topic_from_query(query: str) -> str:
 
 def stage_aligns(meta: Dict[str, Any], lifecycle: str) -> bool:
     """
-    Conservative guardrail to prevent cross-stage leakage.
+    Guardrail to prevent cross-stage leakage.
+
+    Supports both:
+    - legacy metadata: stage, lifecycle
+    - canonical metadata: lifecycle_stage, topic_scope
     """
-    stage = (meta.get("stage") or "").lower()
+
+    stage_text = " ".join([
+        str(meta.get("stage") or ""),
+        str(meta.get("lifecycle") or ""),
+        str(meta.get("lifecycle_stage") or ""),
+        str(meta.get("topic_scope") or ""),
+        str(meta.get("inferred_lifecycle") or ""),
+    ]).lower()
 
     if lifecycle == "pregnancy":
-        return "pregnancy" in stage
+        return "pregnancy" in stage_text or "antenatal" in stage_text
+
     if lifecycle == "postpartum":
-        return "postpartum" in stage
+        return "postpartum" in stage_text or "postnatal" in stage_text
+
     if lifecycle == "breastfeeding":
-        # breastfeeding can be discussed in pregnancy+postpartum guides
-        return ("breast" in stage) or ("postpartum" in stage) or ("pregnancy" in stage)
+        return (
+            "breast" in stage_text
+            or "postpartum" in stage_text
+            or "postnatal" in stage_text
+            or "pregnancy" in stage_text
+            or "newborn" in stage_text
+            or "infant" in stage_text
+        )
+
     if lifecycle in {"newborn", "infant", "toddler"}:
-        return ("baby" in stage) or ("child" in stage) or ("infant" in stage) or ("newborn" in stage)
+        return any(x in stage_text for x in [
+            "baby", "child", "infant", "newborn", "toddler"
+        ])
 
     return True
-
-
 # ============================================================
 # Metadata hygiene helpers
 # ============================================================
@@ -220,10 +264,14 @@ def publisher_counts(hits: List[Dict[str, Any]]) -> Dict[str, int]:
 
 def meta_match_score(meta: Dict[str, Any], topic: str, lifecycle: str) -> int:
     score = 0
+
     if meta.get("topic_hint") == topic:
         score += 2
-    if meta.get("lifecycle") == lifecycle:
+
+    # Accept multi-stage metadata such as pregnancy_postpartum.
+    if stage_aligns(meta, lifecycle):
         score += 2
+
     score += PUBLISHER_PRIORITY.get(meta.get("publisher"), 0)
     return score
 
@@ -251,26 +299,31 @@ def toc_or_nav_penalty(text: str) -> float:
     if short_caps >= 3:
         penalty += 0.05
 
-    return min(0.25, penalty)
-
+    return min(0.5, penalty)
 
 def _tokenize_basic(s: str) -> List[str]:
     return re.findall(r"[a-z0-9]+", (s or "").lower())
 
+def compute_semantic_relevance(a: str, b: str) -> float:
+    emb = embed_texts([a, b])
+    return float(np.dot(emb[0], emb[1]))
 
-def looks_relevant(query: str, text: str, *, min_overlap: float = 0.10) -> bool:
-    """
-    Lightweight sanity gate to prevent obvious cross-topic mismatches.
-    Tokenization is punctuation-robust.
-    """
+def looks_relevant(query: str, text: str) -> bool:
     q_tokens = set(_tokenize_basic(query))
     t_tokens = set(_tokenize_basic(text))
-    if not q_tokens:
-        return False
+
     overlap = len(q_tokens & t_tokens) / max(1, len(q_tokens))
-    return overlap >= min_overlap
 
+    # 🔥 semantic check
+    sim = compute_semantic_relevance(query, text)
 
+    # 🔥 adaptive overlap
+    min_overlap = 0.2 if len(q_tokens) > 5 else 0.3
+
+    return (
+        (overlap >= min_overlap and len(q_tokens & t_tokens) >= 2)
+        or sim > 0.55
+    )
 # ============================================================
 # Source-diverse selection (publisher-aware) + fallback
 # ============================================================
@@ -382,13 +435,52 @@ def inject_best_publisher_hit(
     else:
         out = final_hits + [best]
     return _dedupe_by_id(out)[:k]
+## contradiction detection
+NEGATION_WORDS = {"no", "not", "never", "avoid", "contraindicated"}
 
+def has_negation(s: str):
+    s = s.lower()
+    return any(w in s for w in NEGATION_WORDS)
 
+def detect_potential_conflicts(chunks: List[RetrievedChunk]):
+    sentences = []
+
+    for c in chunks:
+        for s in re.split(r'(?<=[.!?])\s+', c.text):
+            if len(s) > 40:
+                sentences.append((s, c.publisher))
+
+    sentences = sentences[:20]
+
+    contradictions = []
+
+    sent_texts = [s for s, _ in sentences]
+    sent_embs = embed_texts(sent_texts)
+
+    def is_same_topic(s1: str, s2: str):
+        tokens1 = set(_tokenize_basic(s1))
+        tokens2 = set(_tokenize_basic(s2))
+        return len(tokens1 & tokens2) >= 3
+
+    for i in range(len(sentences)):
+        for j in range(i + 1, len(sentences)):
+            s1, p1 = sentences[i]
+            s2, p2 = sentences[j]
+
+            if not is_same_topic(s1, s2):
+                continue
+
+            sim = float(np.dot(sent_embs[i], sent_embs[j]))
+
+            if sim > 0.75:
+                if has_negation(s1) != has_negation(s2):
+                    contradictions.append((s1, s2, p1, p2))
+    return contradictions
 # ============================================================
 # Prompt builder
 # ============================================================
 
-def build_rag_prompt(query: str, chunks: List[RetrievedChunk], lifecycle: str, topic: str) -> str:
+def build_rag_prompt(query: str, chunks: List[RetrievedChunk], lifecycle: str, topic: str,contradictions: List) -> str:
     context = "\n\n".join(c.text[:MAX_CHUNK_CHARS] for c in chunks)
 
     sources = "\n".join(
@@ -396,35 +488,55 @@ def build_rag_prompt(query: str, chunks: List[RetrievedChunk], lifecycle: str, t
         f" | stage={c.stage or 'NA'} | lifecycle={c.lifecycle or 'NA'}"
         for c in chunks
     )
+    
+    conflict_details = ""
 
+    if contradictions:
+        formatted = []
+        for s1, s2, p1, p2 in contradictions[:3]:
+            formatted.append(f"- {p1}: {s1.strip()}\n  VS\n  {p2}: {s2.strip()}")
+        
+        conflict_details = "\n".join(formatted)
+    
+    conflict_instruction = ""
+
+    if contradictions:
+        conflict_instruction = """
+        IMPORTANT:
+        - The retrieved sources contain conflicting medical guidance.
+        - You MUST explicitly compare the differing recommendations.
+        - You MUST NOT merge them into a single unified answer.
+        - Clearly state which source says what.
+        """
+    
     return f"""
-You are an evidence-based maternal/postpartum/newborn RAG assistant.
+    You are an evidence-based maternal/postpartum/newborn RAG assistant.
 
-Lifecycle: {lifecycle}
-Topic: {topic}
+    Lifecycle: {lifecycle}
+    Topic: {topic}
+    {conflict_instruction}
 
-RULES:
-- Use ONLY the provided context.
-- Do not invent facts, recommendations, doses, thresholds, or contraindications.
-- If evidence is limited or conflicting, say so explicitly.
-- Attribute key statements to their publisher when possible (WHO, NHS, ACOG, Cleveland Clinic, etc.).
-- Do NOT add any links/URLs that are not present in the context.
+    Conflicting Evidence: {conflict_details}
+    RULES:
+        - Every medical claim MUST be traceable to at least one source chunk.
+        - Do NOT merge multiple sources into a single claim unless explicitly consistent.
+        - If sources disagree, explicitly state the disagreement.
+        - If answer cannot be supported → say "insufficient evidence".
+    ---------------- CONTEXT ----------------
+    {context}
 
----------------- CONTEXT ----------------
-{context}
+    --------------- QUESTION ----------------
+    {query}
 
---------------- QUESTION ----------------
-{query}
+    ---------------- ANSWER -----------------
+    Write a direct, helpful answer grounded in the context.
 
----------------- ANSWER -----------------
-Write a direct, helpful answer grounded in the context.
+    Evidence & Sources:
+    {sources}
 
-Evidence & Sources:
-{sources}
-
-Uncertainty & Notes:
-State evidence gaps explicitly.
-""".strip()
+    Uncertainty & Notes:
+    State evidence gaps explicitly.
+    """.strip()
 
 
 # ============================================================
@@ -439,7 +551,7 @@ def answer_question(
     llm_fn: Optional[Callable[[str], str]] = None,
     retrieve_fn: Callable[..., List[Dict[str, Any]]] = chroma_retrieve,
     debug: bool = False,
-) -> dict:
+        ) -> dict:
     request_id = str(uuid.uuid4())
 
     pipeline_run_id = os.getenv("TMPRAG_RUN_ID")  # optional experiment-grouping id
@@ -448,11 +560,22 @@ def answer_question(
     lifecycle = infer_lifecycle_from_query(query)
     topic = infer_topic_from_query(query)
 
+    audit_base = {
+            "request_id": request_id,
+            "run_id": audit_run_id,
+            "lifecycle": lifecycle,
+            "topic": topic,
+        }
+
     logger.info("[%s] Inferred lifecycle: %s", audit_run_id, lifecycle)
     logger.info("[%s] Inferred topic: %s", audit_run_id, topic)
 
-    # Retrieval-time filter (important): reduces leakage and improves diversity selection
-    where = {"lifecycle": lifecycle} if lifecycle != "general" else None
+    # Retrieval-time Chroma filter intentionally disabled.
+    # Chroma stores canonical metadata such as lifecycle_stage/topic_scope.
+    # The legacy lifecycle alias is added only after retrieval, so filtering
+    # here with {"lifecycle": lifecycle} incorrectly returns zero hits.
+    # Stage/lifecycle control is applied after retrieval via stage_aligns().
+    where = None
 
     candidate_k = max(k * 12, 48)
     raw_hits = retrieve_fn(query, k=candidate_k, where=where)
@@ -473,7 +596,7 @@ def answer_question(
         logger.warning("[%s] Low stage-aligned evidence; keeping unfiltered hits", audit_run_id)
         candidate_hits = raw_hits
 
-    lifecycle_hits = [h for h in candidate_hits if (h.get("metadata") or {}).get("lifecycle") == lifecycle]
+    lifecycle_hits = [h for h in candidate_hits if stage_aligns(h.get("metadata") or {}, lifecycle)]
     logger.info("[%s] Lifecycle-matched hits: %d", audit_run_id, len(lifecycle_hits))
 
     if lifecycle != "general" and len(lifecycle_hits) >= MIN_EVIDENCE_CHUNKS:
@@ -483,26 +606,73 @@ def answer_question(
             logger.warning("[%s] Low lifecycle evidence; using candidate hits", audit_run_id)
         filtered_for_ranking = candidate_hits
 
-    def _rank_key(h):
+    chunk_texts = [h.get("text", "") for h in filtered_for_ranking]
+    query_emb = _model.encode(["query: " + query],normalize_embeddings=True,
+        convert_to_numpy=True)[0]
+    
+    chunk_embs = _model.encode(["passage: " + t for t in chunk_texts],normalize_embeddings=True,
+        convert_to_numpy=True )   
+    
+    def _rank_key(h, emb):
         meta = h.get("metadata") or {}
         score = meta_match_score(meta, topic, lifecycle)
 
         dist = float(h.get("distance", 1.0))
         penalty = toc_or_nav_penalty(h.get("text", ""))
 
-        # lower "effective distance" is better; penalty makes TOC chunks worse
-        effective_dist = dist + penalty
-        return (score, -effective_dist)
+        relevance = float(np.dot(query_emb, emb))
 
-    ranked = sorted(filtered_for_ranking, key=_rank_key, reverse=True)
+        return (relevance * 5 + score * 2 - (dist + penalty))
+    
+    ranked_pairs = sorted(
+        zip(filtered_for_ranking, chunk_embs),
+        key=lambda x: _rank_key(x[0], x[1]),
+        reverse=True
+    )
+
+    ranked = [h for h, _ in ranked_pairs]
+    # 🔥 CROSS-ENCODER RERANKING
+    top_n = min(20, len(ranked))  # rerank only top candidates
+
+    pairs = [(query, h.get("text", "")) for h in ranked[:top_n]]
+    ce_scores = _cross_encoder.predict(pairs)
+
+    reranked = sorted(
+        zip(ranked[:top_n], ce_scores),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    ranked = [h for h, _ in reranked] + ranked[top_n:]
+    # clean mapping: one source of truth
+    ranked_emb_map = {id(h): e for h, e in ranked_pairs}
 
     final_hits = select_diverse_chunks(ranked, k)
     final_hits = ensure_min_publisher_diversity(
-        ranked_hits=ranked,
-        chosen_hits=final_hits,
-        k=k,
-        min_distinct_publishers=MIN_DISTINCT_PUBLISHERS,
+    ranked_hits=ranked,
+    chosen_hits=final_hits,
+    k=k,
+    min_distinct_publishers=MIN_DISTINCT_PUBLISHERS,
     )
+    final_embs = [ranked_emb_map[id(h)] for h in final_hits]
+    
+    if len(final_hits) == 0:
+        return {
+            "status": "low_trust_evidence",
+            "answer": "",
+            "prompt": "",
+            "audit": {
+                **audit_base,
+                "evidence_strength": len(final_hits) / k,
+                "publisher_diversity": len(publisher_counts(final_hits)),
+                "failure_type": "low_trust_evidence",
+            },
+            "evidence": [],
+        }
+    # 🚨 HARD CHECK: still low diversity → degrade retrieval
+    pubs = {(h.get("metadata") or {}).get("publisher", "UNKNOWN") for h in final_hits}
+    if len(pubs) < MIN_DISTINCT_PUBLISHERS:
+        logger.warning("[%s] Final evidence lacks publisher diversity", audit_run_id)
 
     # Governance: optionally inject a trusted publisher if present
     injected = False
@@ -514,11 +684,27 @@ def answer_question(
 
     # Sanity gate: drop egregiously irrelevant hits, but never drop all evidence
     filtered = [h for h in final_hits if looks_relevant(query, h.get("text", ""))]
-    if filtered:
+
+    if len(filtered) >= MIN_EVIDENCE_CHUNKS:
         final_hits = filtered
+    else:
+        logger.warning("[%s] Relevance filter too aggressive, keeping original hits", audit_run_id)
     final_hits = _dedupe_by_id(final_hits)[:k]
+    final_embs = [ranked_emb_map[id(h)] for h in final_hits]
 
     logger.info("[%s] Final selected hits: %d", audit_run_id, len(final_hits))
+    # 🚨 HARD GATE: insufficient retrieval evidence
+    if len(final_hits) < MIN_EVIDENCE_CHUNKS:
+        return {
+            "status": "retrieval_failure",
+            "answer": "",
+            "prompt": "",
+            "audit": {
+                **audit_base,
+                "failure_type": "retrieval_failure",
+            },
+            "evidence": [],
+        }
     logger.info("[%s] Final publisher distribution: %s", audit_run_id, publisher_counts(final_hits))
 
     if debug:
@@ -558,8 +744,8 @@ def answer_question(
             )
         )
 
-    prompt = build_rag_prompt(query, chunks, lifecycle, topic)
-
+    contradictions = detect_potential_conflicts(chunks)
+    prompt = build_rag_prompt(query, chunks, lifecycle, topic,contradictions)
     audit = {
         "request_id": request_id,
         "pipeline_run_id": pipeline_run_id,
@@ -573,6 +759,7 @@ def answer_question(
         "env_hints": dict(_DEFAULT_ENV_HINTS),
         "retrieval_where": where,
         "candidate_k": candidate_k,
+        "audit": audit_base,
         "publisher_injection": {
             "enabled": FORCE_PUBLISHER_INJECTION,
             "publisher": INJECT_PUBLISHER_NAME,
@@ -592,6 +779,57 @@ def answer_question(
         raise ValueError("use_llm=True requires llm_fn(prompt)->str")
 
     answer = llm_fn(prompt)
+    def split_sentences(text: str):
+        return re.split(r'(?<=[.!?])\s+', text.strip())
+
+# hallucination detection layer
+    
+    def compute_claim_support(answer: str):
+        claims = split_sentences(answer)
+
+        # 🔥 BATCH BOTH
+        claim_embs = embed_texts(claims)
+        chunk_embs = np.array(final_embs)
+
+        results = []
+
+        for ce in claim_embs:
+            sims = np.dot(chunk_embs, ce)
+            best_idx = int(np.argmax(sims))
+            best_score = float(sims[best_idx])
+
+            results.append({
+                "score": best_score,
+                "source_chunk": best_idx,
+                "source_text": chunks[best_idx].text[:200],
+                "source_publisher": chunks[best_idx].publisher
+            })
+
+        return results
+
+    support = compute_claim_support(answer)
+    support_scores = [x["score"] for x in support]
+
+    g_score = sum(support_scores) / len(support_scores) if support_scores else 0.0
+
+    if np.mean(support_scores) < THRESHOLDS["groundedness_mean"]:
+        return {
+            "status": "weak_grounding",
+            "answer": answer,
+            "prompt": prompt,
+            "audit": {**audit_base, "groundedness": g_score},
+            "evidence": [c.__dict__ for c in chunks],
+        }
+
+    if support_scores and min(support_scores) < THRESHOLDS["groundedness_min"]:
+        return {
+            "status": "hallucination_risk",
+            "answer": answer,
+            "prompt": prompt,
+            "audit": {**audit_base, "support_scores": support_scores, 
+                      "claim_support_mapping": support},
+            "evidence": [c.__dict__ for c in chunks],
+        }
 
     return {
         "status": "ok",

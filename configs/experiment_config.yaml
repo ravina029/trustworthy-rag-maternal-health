@@ -1,0 +1,29 @@
+experiment:
+  name: baseline_v1
+  version: v1
+
+run:
+  version: v1
+
+indexing:
+  collection_prefix: maternal_postpartum
+
+queries:
+  - What foods improve recovery after C-section delivery?
+  - Can bananas worsen cold symptoms in infants?
+  - What nutrients are essential for postpartum healing?
+  - Which foods should be avoided during breastfeeding?
+
+retrieval:
+  top_k: 7
+  max_distance: 0.75
+  max_hits_per_publisher: 2
+
+llm:
+  model: llama3
+  temperature: 0.0
+
+debug:
+  enabled: false
+  log_chunk_samples: true
+  log_removed_pages: true
