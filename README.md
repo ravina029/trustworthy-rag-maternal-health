@@ -411,15 +411,3 @@ Then add source PDFs locally, configure `configs/pipeline_config.yaml`, and run 
 This project is intended to be released under the MIT License. Add a `LICENSE` file containing the MIT License text before final public release.
 
 ---
-
-## Suggested Project Description
-
-```text
-Trustworthy RAG for Maternal and Postpartum Health: a local, metadata-governed retrieval-augmented generation pipeline with citation validation, deterministic safety escalation, insufficient-evidence refusal, and baseline-vs-governed evaluation.
-```
-
-Short CV version:
-
-```text
-Developed a local trustworthy RAG pipeline for maternal/newborn health QA; added lifecycle-aware retrieval, citation validation, safety escalation, refusal calibration, and baseline comparison showing 0→100% improvement on safety and insufficient-evidence behavior.
-```
