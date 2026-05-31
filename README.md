@@ -1,8 +1,8 @@
 # Trustworthy RAG for Maternal and Postpartum Health
 
-A privacy-preserving, fully local retrieval-augmented generation (RAG) system for maternal, postpartum, newborn, and infant health information. The project studies how deterministic governance layers improve RAG reliability in a safety-sensitive health-information domain.
+A privacy-preserving, fully local retrieval-augmented generation (RAG) system for maternal, postpartum, newborn, and infant health information. The project studies how deterministic governance layers can improve RAG behavior in a safety-sensitive health-information domain.
 
-> **Research claim:** Vanilla RAG can answer ordinary health-information questions, but it may treat urgent danger signs and unsupported product/local-policy questions as normal answerable prompts. This project adds a metadata-governed safety layer that improves behavioral reliability through lifecycle-aware retrieval, citation governance, deterministic safety escalation, and insufficient-evidence refusal.
+> **Research claim:** Vanilla RAG can answer many ordinary health-information questions, but it may also treat urgent danger signs and unsupported product/local-policy questions as ordinary answerable prompts. This project adds a metadata-governed reliability layer with lifecycle-aware retrieval, citation governance, deterministic safety escalation, and insufficient-evidence refusal.
 
 ---
 
@@ -10,35 +10,37 @@ A privacy-preserving, fully local retrieval-augmented generation (RAG) system fo
 
 The governed RAG system was compared with a vanilla RAG baseline under controlled conditions. Both systems used the same source PDFs, Chroma vector database, embedding model, local LLM, and question sets.
 
+The percentages below are **expected-behavior pass rates on curated evaluation sets**, not estimates of general clinical accuracy.
+
 | Evaluation regime | Expected behavior | Vanilla RAG | Governed RAG | Observation |
 |---|---|---:|---:|---|
-| Answerable QA | Evidence-grounded `ok` answer | 100.0% | 96.7% | Both answer ordinary questions well; governed RAG conservatively escalated one potentially risky baby rash + fever question. |
-| Safety escalation | `safety_escalation` | 0.0% | 100.0% | Governed RAG corrected complete baseline under-escalation. |
-| Insufficient evidence | `insufficient_evidence` | 0.0% | 100.0% | Governed RAG corrected complete baseline over-answering. |
-| Adversarial prompts | Evidence-bound / no fake links / no crash | 100.0% | 100.0% | Both remained link-safe in this setup; governed RAG added conservative refusal behavior. |
+| Answerable QA | Evidence-grounded `ok` answer | 100.0% | 96.7% | Both systems answered ordinary questions well; governed RAG conservatively escalated one potentially risky baby rash + fever question. |
+| Safety stress test | `safety_escalation` | 0.0% | 100.0% | On the curated danger-sign set, governed RAG routed all safety-critical prompts to escalation, while vanilla RAG treated them as ordinary `ok` prompts. |
+| Insufficient-evidence stress test | `insufficient_evidence` | 0.0% | 100.0% | On the curated unsupported-question set, governed RAG refused all product/local-policy/exact-dose traps, while vanilla RAG answered them as `ok`. |
+| Adversarial prompts | Evidence-bound / no fake links / no crash | 100.0% | 100.0% | Both systems remained link-safe in this setup; governed RAG added one conservative refusal. |
 
 ### Reliability Dashboard
 
-| Reliability outcome | Final result |
+| Reliability outcome | Final observed result |
 |---|---:|
 | Exceptions | 0 |
 | Generation errors | 0 |
 | External-link leakage | 0.0 |
-| Safety expected-behavior accuracy | 0.0% → 100.0% |
-| Insufficient-evidence expected-behavior accuracy | 0.0% → 100.0% |
+| Curated safety stress-test pass rate | 0.0% → 100.0% |
+| Curated insufficient-evidence stress-test pass rate | 0.0% → 100.0% |
 | Governed answerable groundedness (`Groundedness_OK`) | 0.978 |
 | Governed traceability | 1.0 across evaluated sets |
 
-### Key Research Observation
+### Key Research Observations
 
 | Observation | Interpretation |
 |---|---|
-| Vanilla RAG performs well on ordinary answerable questions. | Retrieval plus generation is sufficient for many low-risk informational questions. |
-| Vanilla RAG fails safety and refusal behavior. | A generic RAG pipeline can over-answer urgent danger signs and unsupported brand/local-policy questions. |
-| Governed RAG fixes safety and refusal behavior. | Deterministic gates improve behavioral reliability in safety-sensitive settings. |
-| Governance does not mainly improve ordinary answerability. | The strongest contribution is reliability under high-risk and out-of-scope conditions. |
+| Vanilla RAG performed well on ordinary answerable questions. | Retrieval plus generation can be sufficient for many low-risk informational questions. |
+| Vanilla RAG showed observed safety and refusal failures on curated stress tests. | A generic RAG pipeline can over-answer urgent danger signs and unsupported brand/local-policy questions. |
+| Governed RAG eliminated the observed safety under-escalation and unsupported over-answering on the curated stress tests. | Deterministic gates improved behavioral reliability in the evaluated safety-sensitive settings. |
+| Governance did not mainly improve ordinary answerability. | The strongest contribution is reliability under high-risk and out-of-scope conditions. |
 
-Detailed results are stored in:
+### Result Artifacts
 
 | Artifact | Path |
 |---|---|
@@ -253,14 +255,14 @@ Important local folders:
 
 ## Evaluation Design
 
+The evaluation is divided into four behavioral regimes. This category-aware design avoids judging safety-only or refusal-only files using ordinary OK-answer rate.
+
 | Evaluation set | Purpose | Expected behavior |
 |---|---|---|
 | Answerable core | Normal maternal/newborn health-information questions | Evidence-grounded `ok` answer |
 | Safety curated | Danger-sign prompts | `safety_escalation` |
 | Insufficient evidence curated | Product, brand, exact local policy, or unsupported exact-dose questions | `insufficient_evidence` |
 | Adversarial curated | Prompt-injection and evidence-override attempts | Evidence-bound answer or refusal; no fake links |
-
-This category-aware design avoids judging safety-only or refusal-only files using ordinary OK-answer rate.
 
 ### Evaluation Metrics
 
@@ -278,6 +280,10 @@ This category-aware design avoids judging safety-only or refusal-only files usin
 | Core-authoritative-source rate | Whether evidence includes authoritative sources. |
 | Exception / generation-error rate | Software robustness. |
 
+### Metric Interpretation Note
+
+The percentages reported in this repository are **not broad clinical accuracy claims**. They are pass rates on curated evaluation sets designed to stress specific behaviors: normal answerability, safety escalation, insufficient-evidence refusal, and adversarial robustness. The safety and insufficient-evidence sets intentionally contain prompts that should not receive ordinary `ok` answers.
+
 ---
 
 ## Final Governed RAG Results
@@ -285,8 +291,8 @@ This category-aware design avoids judging safety-only or refusal-only files usin
 | Evaluation set | Total | OK | Safety | Insufficient | Exceptions | GenErr | Traceability | Groundedness_OK | LinkLeak | Observation |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | Answerable core | 30 | 29 | 1 | 0 | 0 | 0 | 1.0 | 0.978 | 0.0 | Passed; one conservative escalation. |
-| Safety curated | 15 | 0 | 15 | 0 | 0 | 0 | 1.0 | N/A | 0.0 | Passed; 15/15 safety escalation. |
-| Insufficient evidence | 12 | 0 | 0 | 12 | 0 | 0 | 1.0 | N/A | 0.0 | Passed; 12/12 refusal behavior. |
+| Safety curated | 15 | 0 | 15 | 0 | 0 | 0 | 1.0 | N/A | 0.0 | Passed on curated set; 15/15 safety escalations. |
+| Insufficient evidence | 12 | 0 | 0 | 12 | 0 | 0 | 1.0 | N/A | 0.0 | Passed on curated set; 12/12 insufficient-evidence refusals. |
 | Adversarial curated | 15 | 14 | 0 | 1 | 0 | 0 | 1.0 | 1.0 | 0.0 | Passed; no link leakage, no exceptions. |
 
 ---
@@ -304,12 +310,12 @@ This category-aware design avoids judging safety-only or refusal-only files usin
 
 ## Baseline vs Governed RAG
 
-| Set | Vanilla RAG behavior | Governed RAG behavior | Expected-behavior change | Main finding |
+| Set | Vanilla RAG behavior | Governed RAG behavior | Curated expected-behavior pass rate | Main finding |
 |---|---|---|---:|---|
 | Answerable | 30/30 OK | 29/30 OK + 1 safety escalation | 100.0% → 96.7% | Governed system remains competitive on ordinary QA. |
-| Safety | 15/15 OK | 15/15 safety escalation | 0.0% → 100.0% | Governance fixes complete safety under-escalation. |
-| Insufficient evidence | 12/12 OK | 12/12 insufficient evidence | 0.0% → 100.0% | Governance fixes complete over-answering. |
-| Adversarial | 15/15 OK | 14 OK + 1 insufficient evidence | 100.0% → 100.0% | Both remain link-safe; governed adds refusal behavior. |
+| Safety stress test | 15/15 OK | 15/15 safety escalation | 0.0% → 100.0% | Governance eliminated observed safety under-escalation on this curated set. |
+| Insufficient-evidence stress test | 12/12 OK | 12/12 insufficient evidence | 0.0% → 100.0% | Governance eliminated observed unsupported over-answering on this curated set. |
+| Adversarial | 15/15 OK | 14 OK + 1 insufficient evidence | 100.0% → 100.0% | Both remained link-safe; governed added refusal behavior. |
 
 ### Comparison Artifacts
 
@@ -385,6 +391,7 @@ Then add source PDFs locally, configure `configs/pipeline_config.yaml`, and run 
 | Not a clinical decision system | Research prototype for trustworthy health-information retrieval. |
 | Corpus coverage dependence | Outputs are limited by the local PDF corpus. |
 | Raw PDFs not committed | Source links should be added under `docs/source_links.md`. |
+| Curated-test-set scope | Reported pass rates are stress-test results, not general medical accuracy estimates. |
 | Scorecard not fully category-aware | Safety-only and refusal-only files may trigger generic warnings. |
 | Adversarial baseline not fully raw | Baseline still uses structured JSON-style generation and link normalization. |
 | Streamlit demo not implemented | Planned as a future branch. |
@@ -408,6 +415,4 @@ Then add source PDFs locally, configure `configs/pipeline_config.yaml`, and run 
 
 ## License
 
-This project is intended to be released under the MIT License. Add a `LICENSE` file containing the MIT License text before final public release.
-
----
+This project is released under the MIT License. See `LICENSE`.
