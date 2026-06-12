@@ -53,6 +53,6 @@ Can I treat mastitis at home without seeing a doctor?
 What should I do if my baby has a rash and fever?
 
 
-#How to run: """TMPRAG_QUESTIONS_PATH=eval_questions_full_mixed.txt TMPRAG_MAX_QUESTIONS=None PYTHONPATH=src \
+#How to run: """TMPRAG_QUESTIONS_PATH=configs/eval_sets/eval_questions_full_mixed.txt TMPRAG_MAX_QUESTIONS=None PYTHONPATH=src \
 python src/trustworthy_maternal_postpartum_rag/eval/scorecard.py --full
 """

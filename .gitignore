@@ -37,7 +37,9 @@ data/chunks/
 .ipynb_checkpoints
 
 # Logs
+logs/
 *.log
+
 
 #files
 *.egg-info/

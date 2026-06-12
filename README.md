@@ -26,8 +26,8 @@ The percentages below are **expected-behavior pass rates on curated evaluation s
 | Exceptions | 0 |
 | Generation errors | 0 |
 | External-link leakage | 0.0 |
-| Curated safety stress-test pass rate | 0.0% → 100.0% |
-| Curated insufficient-evidence stress-test pass rate | 0.0% → 100.0% |
+| Curated safety stress-test pass rate | 0.0% → 100.0% (preliminary; further evaluation required)|
+| Curated insufficient-evidence stress-test pass rate | 0.0% → 100.0% (preliminary; further evaluation required)|
 | Governed answerable groundedness (`Groundedness_OK`) | 0.978 |
 | Governed traceability | 1.0 across evaluated sets |
 

@@ -16,10 +16,8 @@ from sentence_transformers import SentenceTransformer
 
 # ============================================================
 # Path-driven configuration
-# ============================================================
-
-QUESTIONS_PATH = Path(os.getenv("TMPRAG_QUESTIONS_PATH", "eval_questions_answerable_core.txt"))
-
+# ==========================================================
+QUESTIONS_PATH = Path(os.getenv("TMPRAG_QUESTIONS_PATH", "configs/eval_sets/eval_questions_answerable_core.txt"))
 CHROMA_DIR = Path("data/chroma_db")
 COLLECTION_NAME = "maternal_postpartum_chunks"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
@@ -389,3 +387,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
