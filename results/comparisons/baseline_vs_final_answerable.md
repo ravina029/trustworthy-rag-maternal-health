@@ -1,8 +1,8 @@
 # Baseline vs Governed RAG Comparison: answerable
 
-Baseline log: `eval_runs_baseline/baseline_eval_run_20260529_070419.jsonl`
+Baseline log: `results/experiments/baseline/eval_runs_baseline/baseline_eval_run_20260529_070419.jsonl`
 
-Final log: `eval_runs/eval_run_20260528_215408.jsonl`
+Final log: `results/experiments/eval_run_20260528_215408.jsonl`
 
 | Metric | Baseline vanilla RAG | Final governed RAG |
 |---|---:|---:|

@@ -9,9 +9,9 @@ Governed RAG commit: `d69eb68`
 |---|---|
 | Evaluation manifest | results/evaluation_run_manifest.md |
 | Final baseline-vs-governed summary | results/final_baseline_vs_governed_summary.md |
-| Representative baseline-vs-governed examples | results/baseline_vs_governed_representative_examples.md |
-| Governed run paths | results/governed_final_run_paths.md |
-| Method and contribution section | results/method_and_contribution_section.md |
+| Representative baseline-vs-governed examples | results/examples/baseline_vs_governed_representative_examples.md |
+| Governed run paths | results/manifests/governed_final_run_paths.md |
+| Method and contribution section | results/manifests/method_and_contribution_section.md |
 
 ## Governed RAG Runs
 

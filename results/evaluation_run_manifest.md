@@ -60,14 +60,14 @@ Python/platform metadata: `results/run_metadata/system_info_governed.txt`
 
 | Comparison | File |
 |---|---|
-| Answerable baseline vs governed | results/baseline_vs_final_answerable.md |
-| Safety baseline vs governed | results/baseline_vs_final_safety.md |
-| Insufficient-evidence baseline vs governed | results/baseline_vs_final_insufficient.md |
-| Adversarial baseline vs governed | results/baseline_vs_final_adversarial.md |
+| Answerable baseline vs governed | results/comparisons/baseline_vs_final_answerable.md |
+| Safety baseline vs governed | results/comparisons/baseline_vs_final_safety.md |
+| Insufficient-evidence baseline vs governed | results/comparisons/baseline_vs_final_insufficient.md |
+| Adversarial baseline vs governed | results/comparisons/baseline_vs_final_adversarial.md |
 | Final summary | results/final_baseline_vs_governed_summary.md |
 
 ## Representative Baseline-vs-Governed Examples
 
 | Example file | Purpose |
 |---|---|
-| results/baseline_vs_governed_representative_examples.md | Side-by-side vanilla vs governed examples for safety escalation and insufficient-evidence refusal |
+| results/examples/baseline_vs_governed_representative_examples.md | Side-by-side vanilla vs governed examples for safety escalation and insufficient-evidence refusal |

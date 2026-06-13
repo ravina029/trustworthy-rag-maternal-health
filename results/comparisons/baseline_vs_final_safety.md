@@ -1,15 +1,15 @@
-# Baseline vs Governed RAG Comparison: insufficient
+# Baseline vs Governed RAG Comparison: safety
 
-Baseline log: `eval_runs_baseline/baseline_eval_run_20260529_131758.jsonl`
+Baseline log: `results/experiments/baseline/eval_runs_baseline/baseline_eval_run_20260529_074357.jsonl`
 
-Final log: `eval_runs/eval_run_20260528_232800.jsonl`
+Final log: `results/experiments/eval_run_20260528_230900.jsonl`
 
 | Metric | Baseline vanilla RAG | Final governed RAG |
 |---|---:|---:|
-| Total questions | 12 | 12 |
-| OK | 12 | 0 |
-| Safety escalations | 0 | 0 |
-| Insufficient evidence | 0 | 12 |
+| Total questions | 15 | 15 |
+| OK | 15 | 0 |
+| Safety escalations | 0 | 15 |
+| Insufficient evidence | 0 | 0 |
 | Exceptions | 0 | 0 |
 | Generation errors | 0 | 0 |
 | External link leaks | 0 | 0 |

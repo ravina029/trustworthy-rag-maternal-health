@@ -45,7 +45,16 @@ logs/
 *.egg-info/
 build/
 dist/
-results/
+results/*
+!results/evaluation_run_manifest.md
+!results/final_baseline_vs_governed_summary.md
+!results/final_project_artifacts_index.md
+!results/comparisons/
+!results/comparisons/*.md
+!results/examples/
+!results/examples/*.md
+!results/manifests/
+!results/manifests/*.md
 *.jsonl
 *.json
 
@@ -58,5 +67,4 @@ dist/
 __pycache__/
 .pytest_cache/
 next.md
-results/
 logs/

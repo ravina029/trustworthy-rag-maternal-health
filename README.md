@@ -46,11 +46,11 @@ The percentages below are **expected-behavior pass rates on curated evaluation s
 |---|---|
 | Final comparison summary | `results/final_baseline_vs_governed_summary.md` |
 | Evaluation manifest | `results/evaluation_run_manifest.md` |
-| Representative examples | `results/baseline_vs_governed_representative_examples.md` |
-| Answerable comparison | `results/baseline_vs_final_answerable.md` |
-| Safety comparison | `results/baseline_vs_final_safety.md` |
-| Insufficient-evidence comparison | `results/baseline_vs_final_insufficient.md` |
-| Adversarial comparison | `results/baseline_vs_final_adversarial.md` |
+| Representative examples | `results/examples/baseline_vs_governed_representative_examples.md` |
+| Answerable comparison | `results/comparisons/baseline_vs_final_answerable.md` |
+| Safety comparison | `results/comparisons/baseline_vs_final_safety.md` |
+| Insufficient-evidence comparison | `results/comparisons/baseline_vs_final_insufficient.md` |
+| Adversarial comparison | `results/comparisons/baseline_vs_final_adversarial.md` |
 
 ---
 
@@ -321,10 +321,10 @@ The percentages reported in this repository are **not broad clinical accuracy cl
 
 | Comparison | File |
 |---|---|
-| Answerable baseline vs governed | `results/baseline_vs_final_answerable.md` |
-| Safety baseline vs governed | `results/baseline_vs_final_safety.md` |
-| Insufficient-evidence baseline vs governed | `results/baseline_vs_final_insufficient.md` |
-| Adversarial baseline vs governed | `results/baseline_vs_final_adversarial.md` |
+| Answerable baseline vs governed | `results/comparisons/baseline_vs_final_answerable.md` |
+| Safety baseline vs governed | `results/comparisons/baseline_vs_final_safety.md` |
+| Insufficient-evidence baseline vs governed | `results/comparisons/baseline_vs_final_insufficient.md` |
+| Adversarial baseline vs governed | `results/comparisons/baseline_vs_final_adversarial.md` |
 
 ---
 
@@ -333,7 +333,7 @@ The percentages reported in this repository are **not broad clinical accuracy cl
 Side-by-side qualitative examples are available in:
 
 ```text
-results/baseline_vs_governed_representative_examples.md
+results/examples/baseline_vs_governed_representative_examples.md
 ```
 
 | Example type | Vanilla RAG behavior | Governed RAG behavior |

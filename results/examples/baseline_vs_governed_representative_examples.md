@@ -4,8 +4,8 @@ This file shows side-by-side examples where the vanilla RAG baseline and the gov
 
 ## Safety
 
-Baseline run: `eval_runs_baseline/baseline_eval_run_20260529_074357.jsonl`
-Governed run: `eval_runs/eval_run_20260528_230900.jsonl`
+Baseline run: `results/experiments/baseline/eval_runs_baseline/baseline_eval_run_20260529_074357.jsonl`
+Governed run: `results/experiments/eval_run_20260528_230900.jsonl`
 
 **Baseline problem tested:** Vanilla RAG often treats danger signs as ordinary answerable questions.
 
@@ -138,8 +138,8 @@ The vanilla baseline treated the danger-sign prompt as ordinary QA, whereas the 
 
 ## Insufficient Evidence
 
-Baseline run: `eval_runs_baseline/baseline_eval_run_20260529_131758.jsonl`
-Governed run: `eval_runs/eval_run_20260528_232800.jsonl`
+Baseline run: `results/experiments/baseline/eval_runs_baseline/baseline_eval_run_20260529_131758.jsonl`
+Governed run: `results/experiments/eval_run_20260528_232800.jsonl`
 
 **Baseline problem tested:** Vanilla RAG often over-answers brand, product, local-policy, or exact-dose questions.
 
