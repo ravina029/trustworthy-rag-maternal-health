@@ -2,13 +2,13 @@
 
 A privacy-preserving, fully local retrieval-augmented generation (RAG) system for maternal, postpartum, newborn, and infant health information. The project studies how deterministic governance layers can improve RAG behavior in a safety-sensitive health-information domain.
 
-> **Research claim:** Vanilla RAG can answer many ordinary health-information questions, but it may also treat urgent danger signs and unsupported product/local-policy questions as ordinary answerable prompts. This project adds a metadata-governed reliability layer with lifecycle-aware retrieval, citation governance, deterministic safety escalation, and insufficient-evidence refusal.
+> **Research claim:** Vanilla RAG can answer many ordinary health-information questions, but it may also treat urgent danger signs and unsupported product, brand, local-policy, or exact-dose questions as ordinary answerable prompts. This project adds a metadata-governed reliability layer with lifecycle-aware retrieval, citation governance, deterministic safety escalation, and insufficient-evidence refusal.
 
 ---
 
 ## Results at a Glance
 
-The governed RAG system was compared with a vanilla RAG baseline under controlled conditions. Both systems used the same source PDFs, Chroma vector database, embedding model, local LLM, and question sets.
+The governed RAG system was compared with a vanilla RAG baseline under controlled conditions. Both systems used the same source PDFs, Chroma vector database, embedding model, local LLM, and curated question sets.
 
 The percentages below are **expected-behavior pass rates on curated evaluation sets**, not estimates of general clinical accuracy.
 
@@ -26,8 +26,8 @@ The percentages below are **expected-behavior pass rates on curated evaluation s
 | Exceptions | 0 |
 | Generation errors | 0 |
 | External-link leakage | 0.0 |
-| Curated safety stress-test pass rate | 0.0% → 100.0% (preliminary; further evaluation required)|
-| Curated insufficient-evidence stress-test pass rate | 0.0% → 100.0% (preliminary; further evaluation required)|
+| Curated safety stress-test pass rate | 0.0% → 100.0% *(preliminary; further evaluation required)* |
+| Curated insufficient-evidence stress-test pass rate | 0.0% → 100.0% *(preliminary; further evaluation required)* |
 | Governed answerable groundedness (`Groundedness_OK`) | 0.978 |
 | Governed traceability | 1.0 across evaluated sets |
 
@@ -132,11 +132,25 @@ Final answer + evidence trace + evaluation audit
 
 ---
 
+## Project Structure
+
+| Path | Role |
+|---|---|
+| `configs/` | Pipeline configs, source policies, document registry, and curated eval sets |
+| `data/` | Local raw PDFs, processed artifacts, and Chroma database |
+| `docs/` | Documentation, examples, and source-link notes |
+| `scripts/` | Main runnable entry points for ingestion, indexing, evaluation, and comparisons |
+| `src/` | Core implementation code |
+| `results/` | Curated summaries, comparisons, manifests, metadata artifacts, and experiment outputs |
+| `logs/` | Local runtime/debug logs (not tracked) |
+
+---
+
 ## Corpus and Data Policy
 
 The system was evaluated on a local corpus of nine public-health PDF documents covering pregnancy, postpartum, breastfeeding, newborn, infant, and child-care topics.
 
-The raw PDFs are **not committed to this repository**. They should be downloaded from official public sources and placed locally under the configured raw-data directory.
+The raw PDFs are **not committed to this repository**. They should be downloaded from official public sources and placed locally under `data/raw/`.
 
 A source-link file should be maintained at:
 
@@ -148,9 +162,15 @@ Recommended source-link format:
 
 | Publisher | Document | Source URL | Local filename |
 |---|---|---|---|
-| WHO | ... | ... | `who_antenatal care.pdf` |
-| NHS | ... | ... | `NHS_pregnancy_postpartum_guide.pdf` |
-| ACOG | ... | ... | `ACOG_Pregnancy Guide.pdf` |
+| WHO | ... | ... | `who_antenatal_care.pdf` |
+| NHS | ... | ... | `nhs_pregnancy_postpartum_guide.pdf` |
+| ACOG | ... | ... | `acog_pregnancy_guide.pdf` |
+
+A small sample text file for lightweight inspection is available at:
+
+```text
+docs/examples/sample_corpus.txt
+```
 
 ### Indexed Corpus Summary
 
@@ -210,18 +230,17 @@ Install and start Ollama separately, then pull the local model:
 ollama pull llama3
 ```
 
-> The project uses Chroma for the vector database. Ensure `chromadb>=0.5.0` is included in `requirements.txt`.
+### Core runtime dependencies
 
-### Recommended `requirements.txt` additions
+Ensure the environment includes the following packages, whether through `requirements.txt` or your local environment setup:
 
 | Dependency | Purpose |
 |---|---|
-| `chromadb>=0.5.0` | Local vector database. |
-| `sentence-transformers>=2.2.2` | Embedding generation. |
-| `torch>=2.2.0` | Transformer backend. |
-| `pymupdf>=1.23.0` | PDF parsing. |
-| `pyyaml>=6.0.0` | Config loading. |
-| `streamlit>=1.27.0` | Planned optional UI. |
+| `chromadb>=0.5.0` | Local vector database |
+| `sentence-transformers>=2.2.2` | Embedding generation |
+| `torch>=2.2.0` | Transformer backend |
+| `pymupdf>=1.23.0` | PDF parsing |
+| `pyyaml>=6.0.0` | Config loading |
 
 ---
 
@@ -239,17 +258,32 @@ The main configuration file is:
 configs/pipeline_config.yaml
 ```
 
-Important local folders:
+### Important local folders
 
 | Path | Purpose | Committed? |
 |---|---|---|
 | `data/raw/` | Local source PDFs | No |
 | `data/processed/` | Processed page-level outputs | No |
-| `data/chunks/` | Chunk files | No |
 | `data/chroma_db/` | Chroma vector database | No |
-| `eval_runs/` | Governed evaluation logs | Usually no, except selected summaries |
-| `eval_runs_baseline/` | Vanilla baseline logs | Usually no, except selected summaries |
-| `results/` | Selected summaries and reports | Yes, selected markdown summaries only |
+| `configs/eval_sets/` | Curated evaluation question sets | Yes |
+| `results/experiments/` | Stored governed/baseline experiment outputs | Usually no |
+| `results/comparisons/` | Baseline-vs-governed comparison summaries | Yes |
+| `results/examples/` | Representative qualitative examples | Yes |
+| `results/manifests/` | Run-path and method manifests | Yes |
+| `results/metadata/` | Metadata metric JSON/CSV artifacts | Usually no |
+| `results/diagnostics/` | Diagnostic and chunk-analysis artifacts | Usually no |
+
+### Typical workflow
+
+A typical end-to-end local workflow is:
+
+1. Place the source PDFs under `data/raw/`
+2. Configure `configs/pipeline_config.yaml`
+3. Run ingestion / preprocessing
+4. Build the Chroma index
+5. Run governed evaluation
+6. Run vanilla baseline evaluation
+7. Generate comparison summaries and representative examples
 
 ---
 
@@ -268,17 +302,17 @@ The evaluation is divided into four behavioral regimes. This category-aware desi
 
 | Metric | What it measures |
 |---|---|
-| OK rate | Whether answerable questions receive normal answers. |
-| Safety-escalation rate | Whether danger-sign prompts are escalated. |
-| Insufficient-evidence rate | Whether unsupported questions are refused. |
-| Traceability | Whether outputs retain evidence/citation audit trails. |
-| Groundedness | Whether answer sentences are supported by retrieved evidence. |
-| Hallucination rate | Unsupported sentence fraction. |
-| Citation hygiene | Whether citations include source metadata and support text. |
-| External-link leakage | Whether the model invents or emits external links. |
-| Stage-alignment rate | Whether evidence matches the expected lifecycle stage. |
-| Core-authoritative-source rate | Whether evidence includes authoritative sources. |
-| Exception / generation-error rate | Software robustness. |
+| OK rate | Whether answerable questions receive normal answers |
+| Safety-escalation rate | Whether danger-sign prompts are escalated |
+| Insufficient-evidence rate | Whether unsupported questions are refused |
+| Traceability | Whether outputs retain evidence/citation audit trails |
+| Groundedness | Whether answer sentences are supported by retrieved evidence |
+| Hallucination rate | Unsupported sentence fraction |
+| Citation hygiene | Whether citations include source metadata and support text |
+| External-link leakage | Whether the model invents or emits external links |
+| Stage-alignment rate | Whether evidence matches the expected lifecycle stage |
+| Core-authoritative-source rate | Whether evidence includes authoritative sources |
+| Exception / generation-error rate | Software robustness |
 
 ### Metric Interpretation Note
 
@@ -290,10 +324,10 @@ The percentages reported in this repository are **not broad clinical accuracy cl
 
 | Evaluation set | Total | OK | Safety | Insufficient | Exceptions | GenErr | Traceability | Groundedness_OK | LinkLeak | Observation |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| Answerable core | 30 | 29 | 1 | 0 | 0 | 0 | 1.0 | 0.978 | 0.0 | Passed; one conservative escalation. |
-| Safety curated | 15 | 0 | 15 | 0 | 0 | 0 | 1.0 | N/A | 0.0 | Passed on curated set; 15/15 safety escalations. |
-| Insufficient evidence | 12 | 0 | 0 | 12 | 0 | 0 | 1.0 | N/A | 0.0 | Passed on curated set; 12/12 insufficient-evidence refusals. |
-| Adversarial curated | 15 | 14 | 0 | 1 | 0 | 0 | 1.0 | 1.0 | 0.0 | Passed; no link leakage, no exceptions. |
+| Answerable core | 30 | 29 | 1 | 0 | 0 | 0 | 1.0 | 0.978 | 0.0 | Passed; one conservative escalation |
+| Safety curated | 15 | 0 | 15 | 0 | 0 | 0 | 1.0 | N/A | 0.0 | Passed on curated set; 15/15 safety escalations |
+| Insufficient evidence | 12 | 0 | 0 | 12 | 0 | 0 | 1.0 | N/A | 0.0 | Passed on curated set; 12/12 insufficient-evidence refusals |
+| Adversarial curated | 15 | 14 | 0 | 1 | 0 | 0 | 1.0 | 1.0 | 0.0 | Passed; no link leakage, no exceptions |
 
 ---
 
@@ -301,10 +335,10 @@ The percentages reported in this repository are **not broad clinical accuracy cl
 
 | Evaluation set | Mean distinct publishers | Publisher diversity rate | Mean stage alignment | Stage-alignment pass rate | Core-authoritative-source rate | Observation |
 |---|---:|---:|---:|---:|---:|---|
-| Answerable core | 1.63 | 0.600 | 0.821 | 0.967 | 0.933 | Strong stage alignment and source authority. |
-| Safety curated | 2.13 | 0.733 | 0.917 | 1.000 | 1.000 | Strong metadata governance during safety escalation. |
-| Insufficient evidence | 2.00 | 0.833 | 0.906 | 1.000 | 1.000 | Strong metadata governance despite refusal behavior. |
-| Adversarial curated | 1.00 | 0.000 | 1.000 | 1.000 | 0.933 | Stage alignment strong; publisher diversity low under attack prompts. |
+| Answerable core | 1.63 | 0.600 | 0.821 | 0.967 | 0.933 | Strong stage alignment and source authority |
+| Safety curated | 2.13 | 0.733 | 0.917 | 1.000 | 1.000 | Strong metadata governance during safety escalation |
+| Insufficient evidence | 2.00 | 0.833 | 0.906 | 1.000 | 1.000 | Strong metadata governance despite refusal behavior |
+| Adversarial curated | 1.00 | 0.000 | 1.000 | 1.000 | 0.933 | Stage alignment strong; publisher diversity low under attack prompts |
 
 ---
 
@@ -312,10 +346,10 @@ The percentages reported in this repository are **not broad clinical accuracy cl
 
 | Set | Vanilla RAG behavior | Governed RAG behavior | Curated expected-behavior pass rate | Main finding |
 |---|---|---|---:|---|
-| Answerable | 30/30 OK | 29/30 OK + 1 safety escalation | 100.0% → 96.7% | Governed system remains competitive on ordinary QA. |
-| Safety stress test | 15/15 OK | 15/15 safety escalation | 0.0% → 100.0% | Governance eliminated observed safety under-escalation on this curated set. |
-| Insufficient-evidence stress test | 12/12 OK | 12/12 insufficient evidence | 0.0% → 100.0% | Governance eliminated observed unsupported over-answering on this curated set. |
-| Adversarial | 15/15 OK | 14 OK + 1 insufficient evidence | 100.0% → 100.0% | Both remained link-safe; governed added refusal behavior. |
+| Answerable | 30/30 OK | 29/30 OK + 1 safety escalation | 100.0% → 96.7% | Governed system remains competitive on ordinary QA |
+| Safety stress test | 15/15 OK | 15/15 safety escalation | 0.0% → 100.0% | Governance eliminated observed safety under-escalation on this curated set |
+| Insufficient-evidence stress test | 12/12 OK | 12/12 insufficient evidence | 0.0% → 100.0% | Governance eliminated observed unsupported over-answering on this curated set |
+| Adversarial | 15/15 OK | 14 OK + 1 insufficient evidence | 100.0% → 100.0% | Both remained link-safe; governed added refusal behavior |
 
 ### Comparison Artifacts
 
@@ -338,35 +372,20 @@ results/examples/baseline_vs_governed_representative_examples.md
 
 | Example type | Vanilla RAG behavior | Governed RAG behavior |
 |---|---|---|
-| Safety-danger prompts | Treats urgent symptoms as ordinary answerable questions. | Routes prompts to safety escalation. |
-| Unsupported product/brand/local-policy prompts | Gives normal answers despite insufficient corpus support. | Refuses with insufficient evidence. |
+| Safety-danger prompts | Treats urgent symptoms as ordinary answerable questions | Routes prompts to safety escalation |
+| Unsupported product/brand/local-policy prompts | Gives normal answers despite insufficient corpus support | Refuses with insufficient evidence |
 
 ---
 
-## Streamlit Demo Status
+## UI Status
 
-A Streamlit demo is planned but not yet included in the final evaluation snapshot. The current project should be treated as a research-grade CLI/local pipeline first.
-
-| Planned UI feature | Status |
-|---|---|
-| User question input | Planned |
-| Retrieved evidence display | Planned |
-| Final answer display | Planned |
-| Citation trace | Planned |
-| Safety/refusal status | Planned |
-| Metadata audit | Planned |
-
-Recommended future branch:
-
-```bash
-git checkout -b feature/streamlit-demo
-```
+A Streamlit-style interface is planned, but the current project should be treated primarily as a research-grade local pipeline and evaluation framework rather than a finished end-user application.
 
 ---
 
 ## Reproducibility Status
 
-The final governed-vs-vanilla evaluation snapshot is committed and pushed. A clean-clone reproducibility test is still pending.
+The governed-vs-vanilla evaluation snapshot and curated result summaries are committed. A full clean-clone reproducibility test is still pending.
 
 Recommended clean-clone test:
 
@@ -380,7 +399,7 @@ pip install -r requirements.txt
 ollama pull llama3
 ```
 
-Then add source PDFs locally, configure `configs/pipeline_config.yaml`, and run the pipeline/evaluation commands.
+Then place the source PDFs locally under `data/raw/`, configure `configs/pipeline_config.yaml`, and run the ingestion, indexing, and evaluation commands.
 
 ---
 
@@ -388,14 +407,14 @@ Then add source PDFs locally, configure `configs/pipeline_config.yaml`, and run 
 
 | Limitation | Current status / mitigation |
 |---|---|
-| Not a clinical decision system | Research prototype for trustworthy health-information retrieval. |
-| Corpus coverage dependence | Outputs are limited by the local PDF corpus. |
-| Raw PDFs not committed | Source links should be added under `docs/source_links.md`. |
-| Curated-test-set scope | Reported pass rates are stress-test results, not general medical accuracy estimates. |
-| Scorecard not fully category-aware | Safety-only and refusal-only files may trigger generic warnings. |
-| Adversarial baseline not fully raw | Baseline still uses structured JSON-style generation and link normalization. |
-| Streamlit demo not implemented | Planned as a future branch. |
-| Clean-clone test pending | To be completed before broad sharing. |
+| Not a clinical decision system | Research prototype for trustworthy health-information retrieval |
+| Corpus coverage dependence | Outputs are limited by the local PDF corpus |
+| Raw PDFs not committed | Source links should be added under `docs/source_links.md` |
+| Curated-test-set scope | Reported pass rates are stress-test results, not general medical accuracy estimates |
+| Scorecard not fully category-aware | Safety-only and refusal-only files may trigger generic warnings |
+| Adversarial baseline not fully raw | Baseline still uses structured JSON-style generation and link normalization |
+| UI not implemented | Planned future work |
+| Clean-clone test pending | To be completed before broader sharing |
 
 ---
 
@@ -403,13 +422,13 @@ Then add source PDFs locally, configure `configs/pipeline_config.yaml`, and run 
 
 | Priority | Task |
 |---:|---|
-| 1 | Add `docs/source_links.md` with official PDF source links. |
-| 2 | Perform and document a clean-clone reproducibility test. |
-| 3 | Make the scorecard category-aware. |
-| 4 | Fix robustness evaluator handling of `json_ok_rate` and `injection_resistance_rate`. |
-| 5 | Add ablation variants: vanilla RAG, +metadata retrieval, +citation governance, +safety gate, +insufficient-evidence gate, final governed system. |
-| 6 | Build Streamlit demo. |
-| 7 | Add README screenshots or demo GIF after the UI is stable. |
+| 1 | Add `docs/source_links.md` with official PDF source links |
+| 2 | Perform and document a clean-clone reproducibility test |
+| 3 | Make the scorecard category-aware |
+| 4 | Fix robustness evaluator handling of `json_ok_rate` and `injection_resistance_rate` |
+| 5 | Add ablation variants: vanilla RAG, +metadata retrieval, +citation governance, +safety gate, +insufficient-evidence gate, final governed system |
+| 6 | Build a lightweight UI/demo |
+| 7 | Add README screenshots or a demo GIF after the UI is stable |
 
 ---
 
